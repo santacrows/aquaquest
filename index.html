@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aqua Quest</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+        font-family: 'Inter', sans-serif;
+        overflow: hidden; /* Prevent scrollbars on the body */
+    }
+    /* Custom scrollbar for all scrollable areas */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #1f2d3d; /* bg-gray-800 */
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #4b5563; /* bg-gray-600 */
+        border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; /* bg-gray-500 */
+    }
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        z-index: 50;
+        justify-content: center;
+        align-items: center;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .log-message {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    .dev-mode-active {
+        filter: drop-shadow(0 0 5px #60a5fa);
+    }
+    /* Animation for level up stat increase */
+    @keyframes fadeOutUp {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-20px); }
+    }
+    .stat-increase-indicator {
+        position: absolute;
+        margin-left: 8px; /* space it out from the stat value */
+        color: #facc15; /* yellow-400 */
+        font-weight: bold;
+        animation: fadeOutUp 2s forwards;
+        pointer-events: none; /* prevent it from interfering with mouse events */
+    }
+    .durability-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 max-w-7xl h-screen flex flex-col md:flex-row gap-4">
+
+        <!-- Left Panel: Character Info - now scrollable -->
+        <div class="w-full md:w-1/3 bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar md:h-full h-[30%]">
+            <!-- Character Header -->
+            <div>
+                <h1 class="text-3xl font-bold text-cyan-400 flex items-center">
+                    <span id="characterName"></span>
+                    <span id="devModeToggle" class="ml-2 cursor-pointer text-2xl">🐟</span>
+                </h1>
+                <p id="characterRaceClass" class="text-lg text-gray-400"></p>
+                <div class="flex justify-between items-center">
+                    <p id="playtime" class="text-sm text-gray-600"></p>
+                    <p id="level20Time" class="text-sm text-yellow-400 font-semibold"></p>
+                </div>
+                <div class="flex gap-2 mt-3">
+                    <button id="saveBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold py-1 px-3 rounded-lg w-full">Save</button>
+                    <button id="loadBtn" class="bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-1 px-3 rounded-lg w-full">Load</button>
+                </div>
+            </div>
+
+            <!-- XP Bar -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <div class="flex justify-between mb-1">
+                    <span class="text-base font-medium text-gray-300">Level <span id="level">1</span></span>
+                    <span class="text-sm font-medium text-gray-300"><span id="currentXp">0</span> / <span id="nextLevelXp">100</span> XP</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                    <div id="xpBar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Attributes</h2>
+                <div class="flex flex-col gap-y-1 text-sm">
+                    <!-- The spans are now wrapped for relative positioning of the level-up indicator -->
+                    <div>Bite Force: <span class="relative inline-block"><span id="statBiteForce" class="font-bold text-white"></span></span></div>
+                    <div>Fin Speed: <span class="relative inline-block"><span id="statFinSpeed" class="font-bold text-white"></span></span></div>
+                    <div>Scale Hardness: <span class="relative inline-block"><span id="statScaleHardness" class="font-bold text-white"></span></span></div>
+                    <div>Lateral Line: <span class="relative inline-block"><span id="statLateralLine" class="font-bold text-white"></span></span></div>
+                    <div>Instinct: <span class="relative inline-block"><span id="statInstinct" class="font-bold text-white"></span></span></div>
+                    <div>Luminescence: <span class="relative inline-block"><span id="statLuminescence" class="font-bold text-white"></span></span></div>
+                </div>
+            </div>
+
+            <!-- Equipment -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Equipment</h2>
+                <ul class="space-y-2 text-sm">
+                    <li><strong>Mouth:</strong> <span id="equipMouth"></span></li>
+                    <li><strong>Dorsal Fin:</strong> <span id="equipDorsalFin"></span></li>
+                    <li><strong>Cranial Plate:</strong> <span id="equipCranialPlate"></span></li>
+                    <li><strong>Scales:</strong> <span id="equipScales"></span></li>
+                    <li><strong>Tail Fin:</strong> <span id="equipTailFin"></span></li>
+                    <li><strong>Symbiont:</strong> <span id="equipSymbiont"></span></li>
+                </ul>
+            </div>
+
+            <!-- Inventory -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Inventory</h2>
+                <div class="text-sm mb-2">
+                    <div>Shells: <span id="shells" class="font-bold text-yellow-300">0</span></div>
+                    <div>Encumbrance: <span id="encumbrance" class="font-bold text-orange-400">0 / 20</span></div>
+                </div>
+                <ul id="inventoryList" class="space-y-1 text-xs text-gray-400 flex-grow overflow-y-auto custom-scrollbar pr-2">
+                    <!-- Inventory items will be added here -->
+                </ul>
+            </div>
+
+            <!-- Consumables -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Consumables</h2>
+                <ul id="consumableList" class="space-y-1 text-sm text-gray-400 h-20 overflow-y-auto custom-scrollbar pr-2">
+                    <!-- Consumables will be added here -->
+                </ul>
+            </div>
+
+            <!-- Spellbook -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Spellbook</h2>
+                <ul id="spellbookList" class="space-y-1 text-sm text-gray-400 h-20 overflow-y-auto custom-scrollbar pr-2">
+                    <!-- Spells will be added here -->
+                </ul>
+            </div>
+            
+            <!-- Reputation -->
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2 text-cyan-300">Reputation</h2>
+                <ul id="reputationList" class="space-y-1 text-sm text-gray-400">
+                    <!-- Reputation will be added here -->
+                </ul>
+            </div>
+
+            <!-- Fun Fact moved here from the right panel -->
+            <div id="funFactContainer" class="bg-gray-900 p-4 rounded-lg flex-shrink-0">
+                <h2 class="text-xl font-semibold mb-2 border-b border-gray-700 pb-2 text-cyan-300">Fun Fact</h2>
+                <p id="funFactText" class="text-sm text-gray-400 italic"></p>
+            </div>
+        </div>
+
+        <!-- Right Panel: Log and Progress -->
+        <div class="w-full md:w-2/3 bg-gray-800 rounded-lg shadow-lg flex flex-col p-6 h-[70%] md:h-full">
+            <!-- Progress Bars -->
+            <div class="flex-shrink-0 mb-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-semibold text-cyan-300">Current Task</h2>
+                    <span id="currentLocationDisplay" class="text-sm font-medium text-gray-400"></span>
+                </div>
+                <!-- Action Bar -->
+                <div class="mb-4">
+                    <div class="flex justify-between mb-1">
+                        <span id="currentAction" class="text-base font-medium text-gray-300">Starting adventure...</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-4">
+                        <div id="actionBar" class="bg-cyan-500 h-4 rounded-full transition-all duration-500 ease-linear" style="width: 0%"></div>
+                    </div>
+                </div>
+                <!-- XP Bar is now in the left panel -->
+            </div>
+            
+            <!-- Log -->
+            <div id="log" class="flex-grow bg-gray-900 rounded-lg p-4 overflow-y-auto h-64 md:h-auto custom-scrollbar">
+                <!-- Log messages will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Save/Load Modals -->
+    <div id="saveModal" class="modal-backdrop">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-11/12 md:w-1/2">
+            <h3 class="text-2xl font-bold text-cyan-400 mb-4">Save Game Code</h3>
+            <p class="text-gray-400 mb-4">Copy this code to save your progress. Keep it somewhere safe!</p>
+            <textarea id="saveCode" readonly class="w-full h-32 bg-gray-900 text-gray-300 p-2 rounded-lg custom-scrollbar"></textarea>
+            <button id="closeSaveModal" class="mt-4 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg w-full">Close</button>
+        </div>
+    </div>
+
+    <div id="loadModal" class="modal-backdrop">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-11/12 md:w-1/2">
+            <h3 class="text-2xl font-bold text-cyan-400 mb-4">Load Game</h3>
+            <p class="text-gray-400 mb-4">Paste your save code below to load your character.</p>
+            <textarea id="loadCode" class="w-full h-32 bg-gray-900 text-gray-300 p-2 rounded-lg custom-scrollbar"></textarea>
+            <div class="flex gap-2 mt-4">
+                <button id="confirmLoad" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg w-full">Load</button>
+                <button id="closeLoadModal" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================================================================================
+        // CONFIGURATION & DATA
+        // ===================================================================================
+        const config = {
+            BASE_TICK_RATE: 100,
+            names: ["Liam","Noah","Oliver","James","Elijah","William","Henry","Lucas","Benjamin","Theodore","Mateo","Levi","Sebastian","Daniel","Jack","Michael","Alexander","Owen","Asher","Samuel","Leo","Jackson","Mason","Ezra","John","Hudson","Luca","Aiden","Joseph","David","Jacob","Logan","Luke","Julian","Gabriel","Grayson","Wyatt","Matthew","Maverick","Dylan","Isaac","Elias","Anthony","Thomas","Jayden","Carter","Santiago","Ezekiel","Charles","Josiah","Caleb","Cooper","Lincoln","Miles","Christopher","Nathan","Isaiah","Kai","Joshua","Andrew","Angel","Adrian","Cameron","Nolan","Waylon","Jaxon","Roman","Eli","Wesley","Aaron","Ian","Christian","Ryan","Leonardo","Brooks","Axel","Walker","Jonathan","Easton","Everett","Weston","Bennett","Robert","Beau","Micah","Colton","Jordan","Jeremiah","Parker","Greyson","Rowan","Adam","Nicholas","Theo","Xavier","Hunter","Dominic","Jace","Gael","River","Thiago","Kayden","Damian","August","Carson","Austin","Myles","Vincent","Finn","Kingston","Jason","Evan","Enzo","Legend","Lorenzo","Harrison","Landon","Silas","Jose","Graham","Max","Troy","Emilio","Zion","Jax","Devin","Ivan","Jesus","Giovanni","Vincente","Karter","Bryson","Atlas","Sawyer","King","Olivia","Emma","Charlotte","Amelia","Sophia","Isabella","Ava","Mia","Evelyn","Luna","Harper","Camila","Sofia","Scarlett","Elizabeth","Eleanor","Emily","Chloe","Mila","Violet","Penelope","Gianna","Aria","Abigail","Ella","Avery","Hazel","Nora","Lily","Aurora","Nova","Ellie","Madison","Grace","Isla","Willow","Zoe","Riley","Stella","Eliana","Ivy","Victoria","Emilia","Hannah","Layla","Naomi","Addison","Audrey","Sarah","Claire","Lucy","Paisley","Everly","Anna","Caroline","Genesis","Aaliyah","Kinsley","Allison","Maya","Aubrey","Madelyn","Autumn","Kennedy","Alexa","Serenity","Sadie","Quinn","Eva","Taylor","Nevaeh","Piper","Leah","Peyton","Ruby","Skylar","Delilah","Bella","Cora","Emery","Ryleigh","Reagan","Valentina","Alexandra","Julia","Jade","Bailey","Maria","Charlie","Melody","Arianna","Kylie","Athena","Faith","Adeline","Alice","Josephine","Adalynn","Lydia","Clara","Vivian","Madeline","Peyton","Julia","Rylee"],
+            races: ['Striped Bass', 'Bluefish', 'Tautog', 'Fluke', 'Scup', 'Black Sea Bass', 'Cod', 'Haddock', 'Pollock', 'Mackerel', 'Alewife', 'American Eel', 'Chain Pickerel', 'Largemouth Bass', 'Smallmouth Bass', 'Yellow Perch', 'White Perch', 'Walleye', 'Northern Pike', 'Brook Trout', 'Brown Trout', 'Rainbow Trout', 'Kokanee Salmon', 'Carp', 'Catfish', 'Sunfish', 'Crappie', 'Skate', 'Dogfish', 'Bonito', 'Menhaden', 'Little Tunny', 'Winter Flounder', 'Sea Robin', 'Monkfish', 'Swordfish', 'Bluefin Tuna', 'Tiger Muskie', 'Pumpkinseed', 'White Sucker', 'Golden Shiner'],
+            raceBonuses: {
+                'Striped Bass': { biteForce: 1, finSpeed: 1, salinityPreference: 2, levelUpBonus: 'biteForce' }, 
+                'Bluefish': { biteForce: 2, salinityPreference: 2, levelUpBonus: 'biteForce' }, 
+                'Tautog': { scaleHardness: 2, salinityPreference: 2, levelUpBonus: 'scaleHardness' },
+                'Fluke': { instinct: 2, salinityPreference: 2, levelUpBonus: 'instinct' }, 
+                'Scup': { scaleHardness: 2, salinityPreference: 2, levelUpBonus: 'scaleHardness' }, 
+                'Black Sea Bass': { biteForce: 1, scaleHardness: 1, salinityPreference: 2, levelUpBonus: 'scaleHardness' },
+                'Cod': { biteForce: 2, salinityPreference: 2, levelUpBonus: 'biteForce' }, 
+                'Haddock': { instinct: 2, salinityPreference: 2, levelUpBonus: 'instinct' }, 
+                'Pollock': { finSpeed: 2, salinityPreference: 2, levelUpBonus: 'finSpeed' },
+                'Mackerel': { finSpeed: 2, salinityPreference: 2, levelUpBonus: 'finSpeed' }, 
+                'Skate': { scaleHardness: 2, salinityPreference: 2, levelUpBonus: 'scaleHardness' }, 
+                'Dogfish': { biteForce: 2, salinityPreference: 2, levelUpBonus: 'biteForce' },
+                'Alewife': { finSpeed: 2, salinityPreference: 1, levelUpBonus: 'finSpeed' }, 
+                'American Eel': { instinct: 2, salinityPreference: 1, levelUpBonus: 'instinct' }, 
+                'Chain Pickerel': { biteForce: 2, salinityPreference: 0, levelUpBonus: 'biteForce' }, 
+                'Largemouth Bass': { biteForce: 2, salinityPreference: 0, levelUpBonus: 'biteForce' }, 
+                'Smallmouth Bass': { finSpeed: 2, salinityPreference: 0, levelUpBonus: 'finSpeed' },
+                'Yellow Perch': { instinct: 2, salinityPreference: 0, levelUpBonus: 'instinct' }, 
+                'White Perch': { instinct: 2, salinityPreference: 1, levelUpBonus: 'instinct' }, 
+                'Walleye': { lateralLine: 2, salinityPreference: 0, levelUpBonus: 'lateralLine' },
+                'Northern Pike': { biteForce: 2, salinityPreference: 0, levelUpBonus: 'biteForce' }, 
+                'Brook Trout': { finSpeed: 2, salinityPreference: 0, levelUpBonus: 'finSpeed' },
+                'Brown Trout': { instinct: 2, salinityPreference: 0, levelUpBonus: 'instinct' }, 
+                'Rainbow Trout': { finSpeed: 2, salinityPreference: 0, levelUpBonus: 'finSpeed' }, 
+                'Kokanee Salmon': { finSpeed: 2, salinityPreference: 0, levelUpBonus: 'finSpeed' },
+                'Carp': { scaleHardness: 2, salinityPreference: 0, levelUpBonus: 'scaleHardness' }, 
+                'Catfish': { lateralLine: 2, salinityPreference: 0, levelUpBonus: 'lateralLine' }, 
+                'Sunfish': { scaleHardness: 2, salinityPreference: 0, levelUpBonus: 'scaleHardness' },
+                'Crappie': { instinct: 2, salinityPreference: 0, levelUpBonus: 'instinct' },
+                'Bonito': { finSpeed: 2, salinityPreference: 2, levelUpBonus: 'finSpeed' },
+                'Menhaden': { scaleHardness: 2, salinityPreference: 2, levelUpBonus: 'scaleHardness' },
+                'Little Tunny': { finSpeed: 2, salinityPreference: 2, levelUpBonus: 'finSpeed' },
+                'Winter Flounder': { instinct: 2, salinityPreference: 2, levelUpBonus: 'instinct' },
+                'Sea Robin': { lateralLine: 2, salinityPreference: 2, levelUpBonus: 'lateralLine' },
+                'Monkfish': { biteForce: 2, salinityPreference: 2, levelUpBonus: 'biteForce' },
+                'Swordfish': { biteForce: 2, salinityPreference: 2, levelUpBonus: 'biteForce' },
+                'Bluefin Tuna': { biteForce: 1, finSpeed: 1, salinityPreference: 2, levelUpBonus: 'biteForce' },
+                'Tiger Muskie': { biteForce: 2, salinityPreference: 0, levelUpBonus: 'biteForce' },
+                'Pumpkinseed': { scaleHardness: 2, salinityPreference: 0, levelUpBonus: 'scaleHardness' },
+                'White Sucker': { lateralLine: 2, salinityPreference: 0, levelUpBonus: 'lateralLine' },
+                'Golden Shiner': { finSpeed: 2, salinityPreference: 0, levelUpBonus: 'finSpeed' }
+            },
+            classes: ['Scavenger', 'Predator', 'Filter Feeder', 'Lure Master', 'Ambush Artist', 'Bottom Dweller', 'Coral Sculptor', 'Ink Ranger', 'Trench Stalker', 'Spore Drifter', 'Aegis Guard', 'Current Rider', 'Deep Seer', 'Frenzied Brawler', 'Fin Striker', 'Kelp Stalker', 'Grove Tender', 'Abyssal Herald'],
+            classBonuses: {
+                'Scavenger': ['lateralLine', 'instinct'],
+                'Predator': ['biteForce', 'finSpeed'],
+                'Filter Feeder': ['scaleHardness', 'luminescence'],
+                'Lure Master': ['luminescence', 'instinct'],
+                'Ambush Artist': ['biteForce', 'instinct'],
+                'Bottom Dweller': ['scaleHardness', 'lateralLine'],
+                'Coral Sculptor': ['luminescence', 'scaleHardness'],
+                'Ink Ranger': ['instinct', 'finSpeed'],
+                'Trench Stalker': ['lateralLine', 'biteForce'],
+                'Spore Drifter': ['luminescence', 'instinct'],
+                'Aegis Guard': ['scaleHardness', 'scaleHardness'],
+                'Current Rider': ['finSpeed', 'finSpeed'],
+                'Deep Seer': ['lateralLine', 'luminescence'],
+                'Frenzied Brawler': ['biteForce', 'biteForce'],
+                'Fin Striker': ['finSpeed', 'biteForce'],
+                'Kelp Stalker': ['instinct', 'finSpeed'],
+                'Grove Tender': ['scaleHardness', 'luminescence'],
+                'Abyssal Herald': ['lateralLine', 'biteForce']
+            },
+            classRestrictions: {}, // This will be populated dynamically
+            locations: {
+                coordinates: {
+                    'Narragansett Bay': { lat: 41.5901, lon: -71.3917 },
+                    'Block Island Sound': { lat: 41.2134, lon: -71.5834 },
+                    'Providence River': { lat: 41.7915, lon: -71.3853 },
+                    'Scituate Reservoir': { lat: 41.7851, lon: -71.5839 },
+                    'Ninigret Pond': { lat: 41.3615, lon: -71.6573 },
+                    'Point Judith Harbor': { lat: 41.3651, lon: -71.5173 },
+                    'Sakonnet River': { lat: 41.5643, lon: -71.2117 },
+                    'Watch Hill Reef': { lat: 41.3069, lon: -71.8542 },
+                    'Beavertail State Park': { lat: 41.4501, lon: -71.4001 },
+                    'Potter\'s Cove': { lat: 41.6334, lon: -71.3167 },
+                    'Mackerel Cove': { lat: 41.4729, lon: -71.3895 },
+                    'Worden Pond': { lat: 41.4584, lon: -71.5976 },
+                    'Pawcatuck River': { lat: 41.3834, lon: -71.8481 },
+                    'Saugatucket River': { lat: 41.4429, lon: -71.5334 },
+                    'Point Judith Pond': { lat: 41.3926, lon: -71.5284 },
+                    'Quonochontaug Pond': { lat: 41.3459, lon: -71.7142 },
+                    'Charlestown Breachway': { lat: 41.3421, lon: -71.6703 },
+                    'Sakonnet Point': { lat: 41.4682, lon: -71.2001 },
+                    'Brenton Reef': { lat: 41.4554, lon: -71.3664 },
+                    'Coxes Ledge': { lat: 41.0500, lon: -71.2500 },
+                    'Sachuest Point': { lat: 41.4829, lon: -71.2417 },
+                    'Haines Memorial Park': { lat: 41.7373, lon: -71.3092 },
+                    'Wyoming Pond': { lat: 41.5034, lon: -71.7270 },
+                    'Carbuncle Pond': { lat: 41.7287, lon: -71.6967 },
+                    'Fort Wetherill Park': { lat: 41.4770, lon: -71.3682 },
+                    'Colt State Park': { lat: 41.6720, lon: -71.2917 },
+                    'Lincoln Woods': { lat: 41.8848, lon: -71.4478 },
+                    'Goddard Park': { lat: 41.6715, lon: -71.4114 },
+                    'Stillhouse Cove': { lat: 41.7826, lon: -71.3967 },
+                    'Black Point': { lat: 41.3984, lon: -71.4459 },
+                    'East Matunuck': { lat: 41.3709, lon: -71.5309 },
+                    'Misquamicut': { lat: 41.321, lon: -71.812 },
+                    'Narrow River': { lat: 41.45, lon: -71.45 },
+                    'Hundred Acre Cove': { lat: 41.74, lon: -71.34 }
+                },
+                effects: {
+                    'Narragansett Bay': { minEnemyLevel: 0, maxEnemyLevel: 1, lootChanceModifier: 1.2, xpModifier: 1.0, color: 'text-blue-400', salinity: 1 },
+                    'Block Island Sound': { minEnemyLevel: 1, maxEnemyLevel: 3, lootChanceModifier: 1.0, xpModifier: 1.5, color: 'text-indigo-400', salinity: 2 },
+                    'Providence River': { minEnemyLevel: -1, maxEnemyLevel: 1, lootChanceModifier: 1.1, xpModifier: 0.9, color: 'text-yellow-600', salinity: 1 },
+                    'Scituate Reservoir': { minEnemyLevel: -2, maxEnemyLevel: 0, lootChanceModifier: 0.8, xpModifier: 0.8, color: 'text-green-400', salinity: 0 },
+                    'Ninigret Pond': { minEnemyLevel: -2, maxEnemyLevel: 0, lootChanceModifier: 1.5, xpModifier: 0.7, color: 'text-green-300', salinity: 1 },
+                    'Point Judith Harbor': { minEnemyLevel: 0, maxEnemyLevel: 2, lootChanceModifier: 1.4, xpModifier: 1.1, color: 'text-gray-400', salinity: 2 },
+                    'Sakonnet River': { minEnemyLevel: 0, maxEnemyLevel: 1, lootChanceModifier: 1.2, xpModifier: 1.1, color: 'text-blue-300', salinity: 1 },
+                    'Watch Hill Reef': { minEnemyLevel: 1, maxEnemyLevel: 2, lootChanceModifier: 1.3, xpModifier: 1.2, color: 'text-red-400', salinity: 2 },
+                    'Beavertail State Park': { minEnemyLevel: 1, maxEnemyLevel: 2, lootChanceModifier: 1.5, xpModifier: 1.3, color: 'text-teal-400', salinity: 2 },
+                    'Potter\'s Cove': { minEnemyLevel: -1, maxEnemyLevel: 1, lootChanceModifier: 1.3, xpModifier: 0.9, color: 'text-cyan-300', salinity: 1 },
+                    'Mackerel Cove': { minEnemyLevel: 0, maxEnemyLevel: 2, lootChanceModifier: 1.2, xpModifier: 1.1, color: 'text-blue-500', salinity: 2 },
+                    'Worden Pond': { minEnemyLevel: -2, maxEnemyLevel: 0, lootChanceModifier: 1.0, xpModifier: 0.8, color: 'text-green-500', salinity: 0 },
+                    'Pawcatuck River': { minEnemyLevel: -1, maxEnemyLevel: 1, lootChanceModifier: 1.1, xpModifier: 1.0, color: 'text-yellow-700', salinity: 1 },
+                    'Saugatucket River': { minEnemyLevel: -2, maxEnemyLevel: 0, lootChanceModifier: 1.0, xpModifier: 0.9, color: 'text-green-600', salinity: 0 },
+                    'Point Judith Pond': { minEnemyLevel: 0, maxEnemyLevel: 1, lootChanceModifier: 1.4, xpModifier: 1.0, color: 'text-teal-500', salinity: 1 },
+                    'Quonochontaug Pond': { minEnemyLevel: -1, maxEnemyLevel: 1, lootChanceModifier: 1.6, xpModifier: 0.9, color: 'text-cyan-500', salinity: 1 },
+                    'Charlestown Breachway': { minEnemyLevel: 1, maxEnemyLevel: 2, lootChanceModifier: 1.3, xpModifier: 1.2, color: 'text-blue-600', salinity: 2 },
+                    'Sakonnet Point': { minEnemyLevel: 1, maxEnemyLevel: 2, lootChanceModifier: 1.2, xpModifier: 1.3, color: 'text-indigo-500', salinity: 2 },
+                    'Brenton Reef': { minEnemyLevel: 2, maxEnemyLevel: 3, lootChanceModifier: 1.1, xpModifier: 1.4, color: 'text-red-500', salinity: 2 },
+                    'Coxes Ledge': { minEnemyLevel: -2, maxEnemyLevel: 4, lootChanceModifier: 1.0, xpModifier: 1.6, color: 'text-purple-500', salinity: 2 },
+                    'Sachuest Point': { minEnemyLevel: 2, maxEnemyLevel: 7, lootChanceModifier: 0.9, xpModifier: 1.7, color: 'text-red-600', salinity: 2 },
+                    'Haines Memorial Park': { lat: 41.7373, lon: -71.3092, minEnemyLevel: 3, maxEnemyLevel: 5, lootChanceModifier: 1.1, xpModifier: 1.8, color: 'text-emerald-400', salinity: 1 },
+                    'Wyoming Pond': { minEnemyLevel: -3, maxEnemyLevel: 5, lootChanceModifier: 0.9, xpModifier: 1.9, color: 'text-lime-500', salinity: 0 },
+                    'Carbuncle Pond': { minEnemyLevel: -4, maxEnemyLevel: 5, lootChanceModifier: 1.0, xpModifier: 2.0, color: 'text-yellow-400', salinity: 0 },
+                    'Fort Wetherill Park': { minEnemyLevel: -3, maxEnemyLevel: 5, lootChanceModifier: 1.3, xpModifier: 2.2, color: 'text-orange-500', salinity: 2 },
+                    'Colt State Park': { minEnemyLevel: 0, maxEnemyLevel: 5, lootChanceModifier: 1.2, xpModifier: 2.3, color: 'text-rose-500', salinity: 1 },
+                    'Lincoln Woods': { minEnemyLevel: -2, maxEnemyLevel: 5, lootChanceModifier: 1.0, xpModifier: 2.5, color: 'text-fuchsia-500', salinity: 0 },
+                    'Goddard Park': { minEnemyLevel: 1, maxEnemyLevel: 4, lootChanceModifier: 1.4, xpModifier: 2.7, color: 'text-violet-500', salinity: 1 },
+                    'Stillhouse Cove': { minEnemyLevel: 2, maxEnemyLevel: 5, lootChanceModifier: 1.5, xpModifier: 3.0, color: 'text-gray-500', salinity: 1 },
+                    'Black Point': { minEnemyLevel: -2, maxEnemyLevel: 6, lootChanceModifier: 1.3, xpModifier: 3.2, color: 'text-blue-400', salinity: 2 },
+                    'East Matunuck': { minEnemyLevel: 0, maxEnemyLevel: 8, lootChanceModifier: 1.2, xpModifier: 4.5, color: 'text-cyan-400', salinity: 2 },
+                    'Narrow River': { minEnemyLevel: -1, maxEnemyLevel: 3, lootChanceModifier: 1.3, xpModifier: 1.2, color: 'text-teal-300', salinity: 1 },
+                    'Hundred Acre Cove': { minEnemyLevel: 0, maxEnemyLevel: 4, lootChanceModifier: 1.5, xpModifier: 1.4, color: 'text-amber-400', salinity: 1 },
+                    'Misquamicut': { minEnemyLevel: 2, maxEnemyLevel: 9, lootChanceModifier: 1.1, xpModifier: 5.0, color: 'text-orange-400', salinity: 2 }
+                }
+            },
+            monsters: {
+                prefixes: ['Grumpy', 'Giant', 'Vicious', 'Electric', 'Venomous', 'Armored', 'Goliath', 'Ghostly', 'Colossal', 'Mind-bending', 'Ravenous', 'Ancient', 'Mossy', 'Snapping', 'Enraged', 'Monstrous', 'Barnacled', 'Tide-Worn', 'Polluted', 'Savage', 'Screaming', 'Shadowy', 'Frenzied', 'Gargantuan', 'Lurking', 'Brackish', 'Corrupted', 'Diseased', 'Murky', 'Spiny', 'Barbed', 'Jagged', 'Obsidian', 'Nightmare', 'Howling', 'Whispering', 'Silent', 'Raging', 'Thundering', 'Vengeful', 'Soul-eating', 'Crazed', 'Insane', 'Gibbering', 'Moaning', 'Weeping', 'Sorrowful', 'Grieving', 'Mourning', 'Despairing', 'Hopeless', 'Lost', 'Forgotten', 'Forsaken', 'Abandoned', 'Cursed', 'Hexed', 'Bewitched', 'Enchanted', 'Charmed', 'Mesmerized', 'Hypnotized', 'Beguiled', 'Deceived', 'Tricked', 'Fooled', 'Gullible', 'Naive', 'Innocent', 'Pure', 'Sinless', 'Virtuous', 'Righteous', 'Just', 'Fair', 'Honest', 'True', 'Loyal', 'Faithful', 'Devoted', 'Dedicated', 'Committed', 'Steadfast', 'Resolute', 'Determined', 'Unyielding', 'Unflinching', 'Unwavering']
+            },
+            bosses: {
+                'The Abyssal Tyrant': { location: 'Coxes Ledge', name: 'The Abyssal Tyrant, Leviathan Angler', legendarySlot: 'mouth' },
+                'Old Man of the Sea': { location: 'Watch Hill Reef', name: 'Old Man of the Sea, the Barnacled Snapper', legendarySlot: 'cranialPlate' },
+                'The Sunken Specter': { location: 'Brenton Reef', name: 'The Sunken Specter, a Ghostly Fluke', legendarySlot: 'symbiont' },
+                'Goliath of the Wrecks': { location: 'Fort Wetherill Park', name: 'Goliath of the Wrecks, an Iron-Scaled Tautog', legendarySlot: 'scales' },
+                'The Scarlet Scythe': { location: 'Sachuest Point', name: 'The Scarlet Scythe, a Bloodthirsty Shark', legendarySlot: 'dorsalFin' },
+                'The River King': { location: 'Pawcatuck River', name: 'The River King, an Ancient Striped Bass', legendarySlot: 'tailFin' }
+            },
+            miniBosses: {
+                names: ['Great White Shark', 'Tiger Shark', 'Hammerhead Shark', 'Mako Shark', 'Thresher Shark', 'Bull Shark']
+            },
+            merchants: {
+                'Finneas the Fin-Trader': { type: 'gear', species: 'Finneas the Humpback Whale Fin-Trader' },
+                'Coralia the Spell-Singer': { type: 'spells', species: 'Coralia the Blue Whale Spell-Singer' },
+                'Barnaby the Bait-Broker': { type: 'consumables', species: 'Barnaby the Sperm Whale Bait-Broker' }
+            },
+            specialEncounters: {
+                'beaver': { faction: 'Mammal', name: 'Beaver bounty hunter', emoji: 'beaver' },
+                'eagle': { faction: 'Bird', name: 'Bald Eagle thug', emoji: 'eagle' },
+                'octopus': { faction: 'Mollusk', name: 'Octopus gangster', emoji: 'octopus' },
+                'lobster': { faction: 'Crustacean', name: 'Lobster hitman', emoji: 'lobster' },
+                'starfish': { faction: 'Echinoderm', name: 'Starfish assassin', emoji: 'starfish' },
+                'crab': { faction: 'Crustacean', name: 'Kingsley the High-Roller', emoji: 'crab' },
+                'otter': { faction: 'Mammal', name: 'Oscar the Otter', emoji: 'otter' },
+                'swan': { faction: 'Bird', name: 'The Serene Swan Sovereign', emoji: 'swan' },
+                'duck': { faction: 'Bird', name: 'Derek the Duck', emoji: 'duck' },
+                'squid': { faction: 'Mollusk', name: 'Inky the Abyssal Artist', emoji: 'squid' },
+                'shrimp': { faction: 'Crustacean', name: 'Sammy the Shrimp', emoji: 'shrimp' },
+                'blowfish': { faction: 'Other', name: 'Puffy the Petulant Blowfish', emoji: 'blowfish' }
+            },
+            equipment: {
+                bases: {
+                    mouth: ['Gnashers', 'Beak', 'Needle-Teeth', 'Grinding Plates', 'Snaggletooth', 'Filter Baleen', 'Venomous Barb', 'Serrated Jaw', 'Hooked Mandible'],
+                    dorsalFin: ['Fin', 'Shield', 'Razor Fin', 'Banner', 'Sail', 'Crest', 'Spines', 'Ridge'],
+                    cranialPlate: ['Skull', 'Node', 'Growth', 'Brow', 'Dish', 'Horn', 'Carapace', 'Helmet'],
+                    scales: ['Scales', 'Coat', 'Plates', 'Glass Scales', 'Pearl-Plating', 'Hide', 'Pelt'],
+                    tailFin: ['Caudal Fin', 'Whip-fin', 'Rudder', 'Fan', 'Siphon', 'Tentacle', 'Fluke', 'Paddle'],
+                    symbiont: ['Cleaner Shrimp', 'Pilot Fish', 'Anemone', 'Isopod', 'Lanternfish', 'Remora', 'Leech', 'Algae Patch', 'Sponge']
+                },
+                symbiontStats: {
+                    'Cleaner Shrimp': { primaryStat: 'biteForce' },
+                    'Pilot Fish': { primaryStat: 'finSpeed' },
+                    'Anemone': { primaryStat: 'scaleHardness' },
+                    'Isopod': { primaryStat: 'lateralLine' },
+                    'Lanternfish': { primaryStat: 'luminescence' },
+                    'Remora': { primaryStat: 'instinct' },
+                    'Leech': { primaryStat: 'biteForce', secondaryStat: 'finSpeed' },
+                    'Algae Patch': { primaryStat: 'scaleHardness', secondaryStat: 'luminescence' },
+                    'Sponge': { primaryStat: 'instinct', secondaryStat: 'lateralLine' }
+                },
+                tierWeights: {
+                    'Basic':     { weight: 70, factor: -1.0 },
+                    'Jagged':    { weight: 30, factor: -0.5 },
+                    'Chitinous': { weight: 15, factor: 0.1 },
+                    'Skeletal':  { weight: 8,  factor: 0.3 },
+                    'Pearlescent': { weight: 4,  factor: 0.5 },
+                    'Ancient':   { weight: 1,  factor: 0.7 }
+                },
+                tierOrder: ['Basic', 'Jagged', 'Chitinous', 'Skeletal', 'Pearlescent', 'Ancient'],
+                brokenAdjectives: ['Cracked', 'Broken', 'Busted', 'Scuffed', 'Tattered'],
+                tiers: {
+                    'Basic': { bonus: 1, adjectives: ['Basic', 'Simple', 'Plain', 'Common', 'Rough'], value: 1, color: 'text-gray-400', levelReq: 1 },
+                    'Jagged': { bonus: 5, adjectives: ['Jagged', 'Rusty', 'Tattered', 'Worn', 'Chipped'], value: 3, color: 'text-orange-400', levelReq: 3 },
+                    'Chitinous': { bonus: 8, adjectives: ['Chitinous', 'Barnacle-Encrusted', 'Hardened', 'Calloused', 'Leathery'], value: 5, color: 'text-yellow-300', levelReq: 5 },
+					'Skeletal': { bonus: 13, adjectives: ['Bony', 'Plated', 'Calcified', 'Metallic', 'Lithified'], value: 8, color: 'text-yellow-100', levelReq: 8 },
+                    'Pearlescent': { bonus: 21, adjectives: ['Pearlescent', 'Prismatic', 'Glimmering', 'Iridescent', 'Shining'], value: 12, color: 'text-cyan-100', levelReq: 12 },
+                    'Ancient': { bonus: 28, adjectives: ['Ancient', 'Forgotten', 'Hallowed', 'Elder', 'Relic'], value: 17, color: 'text-cyan-400', levelReq: 17 },
+                    'Legendary': { bonus: 50, value: 50, color: 'text-blue-500', levelReq: 0 }
+                },
+                magicalAdjectives: ['Glowing', 'Ghostly', 'Vampiric', 'Vibrating', 'Humming', 'Singing', 'Whispering'],
+                slotStats: {
+                    mouth: 'biteForce', dorsalFin: 'finSpeed', cranialPlate: 'scaleHardness',
+                    scales: 'scaleHardness', tailFin: 'finSpeed'
+                }
+            },
+            loot: {
+                'Coral Fragment': { value: 90 },
+                'Sand Dollar': { value: 140 },
+                'Polished Pebble': { value: 50 },
+                'Barnacle Cluster': { value: 70 },
+                'Twisted Kelp': { value: 60 },
+                'Sunken Doubloon': { value: 300 },
+                'Message in a Bottle': { value: 310 },
+                'Lobster Claw': { value: 180 },
+                'Crab Carapace': { value: 140 },
+                'Sea Glass': { value: 80 },
+                'Driftwood': { value: 70 },
+                'Mermaid\'s Purse': { value: 250 },
+                'Urchin Spine': { value: 110 },
+                'Shark Tooth': { value: 180 },
+                'Bioluminescent Algae': { value: 140 },
+                'Shipwreck Splinter': { value: 40 },
+                'Fish Hook': { value: 100 },
+                'Trilobite Fossil': { value: 300 },
+                'Bottle Cap': { value: 30 },
+                'Shrimp Tail': { value: 50 }
+            },
+            quest: {
+                verbs: [
+                    { text: 'Poke', rep: -1 }, { text: 'Annoy', rep: -2 }, { text: 'Scare away', rep: -1 },
+                    { text: 'Collect the slime of', rep: -1 }, { text: 'Investigate the smell of', rep: 0 },
+                    { text: 'Deliver a shiny pebble to', rep: 2 }, { text: 'Scout the territory of', rep: 0 },
+                    { text: 'Chart the path of', rep: 1 }, { text: 'Disrupt the feeding frenzy of', rep: -2 },
+                    { text: 'Find a lost pearl for', rep: 3 }, { text: 'Retrieve a lost trinket from', rep: 1 },
+                    { text: 'Clean the algae off', rep: 2 }, { text: 'Deliver a warning to', rep: 1 },
+                    { text: 'Follow the trail of', rep: 0 }, { text: 'Build a nest near', rep: 2 },
+                    { text: 'Protect the young of', rep: 3 }, { text: 'Scare parasites from', rep: 2 },
+                    { text: 'Find a home for', rep: 3 }, { text: 'Clear debris from', rep: 2 },
+                    { text: 'Sing a song to', rep: 1 }, { text: 'Challenge the authority of', rep: -2 },
+                    { text: 'Explore the wreckage of', rep: 0 }, { text: 'Intimidate', rep: -1 },
+                    { text: 'Steal from the nest of', rep: -3 }, { text: 'Harass', rep: -3 },
+                    { text: 'Poison the food of', rep: -4 }, { text: 'Smash the home of', rep: -4 },
+                    { text: 'Gather samples from', rep: 1 }, { text: 'Help a lost kin of', rep: 3 },
+                    { text: 'Negotiate a truce with', rep: 2 }, { text: 'Create a map of the migration routes for', rep: 2 },
+                    { text: 'Rescue the trapped pup of', rep: 3 }, { text: 'Heal a wounded member of', rep: 4 },
+                    { text: 'Defend the territory of', rep: 3 }, { text: 'Assist with the hunt of', rep: 2 },
+                    { text: 'Remove a painful hook from', rep: 3 }, { text: 'Act as a courier for', rep: 1 },
+                    { text: 'Clear a tangled net for', rep: 2 }, { text: 'Translate the song of', rep: 1 },
+                    { text: 'Rebuild the home of', rep: 3 }, { text: 'Plant new seagrass for', rep: 2 },
+                    { text: 'Observe the feeding habits of', rep: 0 }, { text: 'Patrol the perimeter of', rep: 0 },
+                    { text: 'Document the behavior of', rep: 0 }, { text: 'Deliver a message to', rep: 0 },
+                    { text: 'Remove invasive species from the habitat of', rep: 1 }, { text: 'Count the population of', rep: 0 },
+                    { text: 'Vandalize the signs of', rep: -2 }, { text: 'Spread false rumors about', rep: -2 },
+                    { text: 'Pollute the waters of', rep: -3 }, { text: 'Sabotage the defenses of', rep: -4 },
+                    { text: 'Start a food chain panic for', rep: -3 }, { text: 'Block the migration path of', rep: -2 }
+                ],
+                targets: [
+                    { name: 'a Blue Crab', faction: 'Crustacean' }, { name: 'a Horseshoe Crab', faction: 'Crustacean' },
+                    { name: 'a Rock Crab', faction: 'Crustacean' }, { name: 'a Green Crab', faction: 'Crustacean' },
+                    { name: 'a territorial Lobster', faction: 'Crustacean' }, { name: 'a swarm of Sand Fleas', faction: 'Crustacean' },
+                    { name: 'a hermit crab settlement', faction: 'Crustacean' }, { name: 'a Fiddler Crab', faction: 'Crustacean' },
+                    { name: 'a Calico Crab', faction: 'Crustacean' }, { name: 'a Mole Crab', faction: 'Crustacean' },
+                    { name: 'a Spider Crab', faction: 'Crustacean' },
+                    { name: 'a colony of Quahogs', faction: 'Mollusk' }, { name: 'a bed of Mussels', faction: 'Mollusk' },
+                    { name: 'a migrating Squid', faction: 'Mollusk' }, { name: 'a Common Atlantic Octopus', faction: 'Mollusk' },
+                    { name: 'a Moon Snail', faction: 'Mollusk' }, { name: 'a colony of Periwinkles', faction: 'Mollusk' },
+                    { name: 'a school of Cuttlefish', faction: 'Mollusk' }, { name: 'a Giant Scallop', faction: 'Mollusk' },
+                    { name: 'a Soft-shell Clam', faction: 'Mollusk' }, { name: 'an Oyster bed', faction: 'Mollusk' },
+                    { name: 'a Whelk colony', faction: 'Mollusk' },
+                    { name: 'a playful Harbor Seal', faction: 'Mammal' }, { name: 'a family of River Otters', faction: 'Mammal' },
+                    { name: 'a pod of Dolphins', faction: 'Mammal' }, { name: 'a Humpback Whale', faction: 'Mammal' },
+                    { name: 'a Grey Seal', faction: 'Mammal' }, { name: 'a curious Minke Whale', faction: 'Mammal' },
+                    { name: 'a Right Whale mother and calf', faction: 'Mammal' }, { name: 'a pod of Pilot Whales', faction: 'Mammal' },
+                    { name: 'a school of Bottle-nosed Dolphins', faction: 'Mammal' }, { name: 'a pod of Fin Whales', faction: 'Mammal' },
+                    { name: 'a playful Porpoise', faction: 'Mammal' },
+                    { name: 'a hungry Cormorant', faction: 'Bird' }, { name: 'a flock of Seagulls', faction: 'Bird' },
+                    { name: 'a territorial Swan', faction: 'Bird' }, { name: 'a diving Osprey', faction: 'Bird' },
+                    { name: 'a Tern colony', faction: 'Bird' }, { name: 'a Great Blue Heron', faction: 'Bird' },
+                    { name: 'a flock of Black Skimmers', faction: 'Bird' }, { name: 'a diving Gannet', faction: 'Bird' },
+                    { name: 'a group of Sanderlings', faction: 'Bird' }, { name: 'a nesting Common Tern', faction: 'Bird' },
+                    { name: 'an Oystercatcher', faction: 'Bird' },
+                    { name: 'a shy Sea Star', faction: 'Echinoderm' }, { name: 'a grumpy Sea Urchin', faction: 'Echinoderm' },
+                    { name: 'a Brittle Star colony', faction: 'Echinoderm' }, { name: 'a Sand Dollar patch', faction: 'Echinoderm' },
+                    { name: 'a Sea Cucumber', faction: 'Echinoderm' },
+                    { name: 'a cluster of Sea Squirts', faction: 'Other' }, { name: 'a school of jellyfish', faction: 'Other' },
+                    { name: 'a large sea sponge', faction: 'Other' }, { name: 'an old shipwreck', faction: 'Other' },
+                    { name: 'a bed of Sea Anemones', faction: 'Other' }
+                ]
+            },
+            spells: {
+                'bioluminescentFlash': { name: 'Bioluminescent Flash', type: 'combat', power: [1.2, 1.4, 1.6, 1.8, 2.1], minLuminescence: 10 },
+                'crushingPressure': { name: 'Crushing Pressure', type: 'combat', power: [1.5, 1.8, 2.1, 2.6, 3.0], minLateralLine: 15 },
+                'inkCloud': { name: 'Ink Cloud', type: 'utility', effect: 'escape', duration: [2, 3, 4, 5, 6], minLateralLine: 12 },
+                'hardenScales': { name: 'Harden Scales', type: 'buff', stat: 'scaleHardness', amount: [3, 5, 7, 9, 12], duration: [2, 3, 3, 4, 4], minLuminescence: 8 },
+                'finFrenzy': { name: 'Fin Frenzy', type: 'buff', stat: 'finSpeed', amount: [5, 10, 15, 20, 25], duration: [2, 3, 3, 4, 4], minLateralLine: 8 },
+                'sonarPulse': { name: 'Sonar Pulse', type: 'utility', effect: 'findLoot', duration: [2, 3, 4, 5, 6], minLateralLine: 20 },
+                'bubbleSwarm': { name: 'Bubble Swarm', type: 'combat', power: [1.0, 1.0, 1.1, 1.1, 1.2], effect: 'confuse', minInstinct: 15, successChance: [0.2, 0.4, 0.6, 0.8, 1.0] },
+                'waveTuning': { name: 'Wave Tuning', type: 'utility', effect: 'travelSpeed', duration: [2, 3, 5, 8, 11], minFinSpeed: 15 },
+                'pearlOfLuck': { name: 'Pearl of Luck', type: 'utility', effect: 'magicFind', duration: [3, 4, 5, 6, 7], minLuminescence: 20 },
+                'jetStream': { name: 'Jet Stream', type: 'combat', power: [1.5, 1.8, 2.1, 2.5, 3.0], minFinSpeed: 12 },
+                'barbedHide': { name: 'Barbed Hide', type: 'buff', stat: 'scaleHardness', amount: [2, 4, 6, 8, 10], duration: [3, 3, 4, 4, 5], effect: 'thorns' },
+                'deepSlumber': { name: 'Deep Slumber', type: 'utility', effect: 'sleep', minInstinct: 25, successChance: [0.2, 0.4, 0.6, 0.8, 1.0] },
+                'predatorsScent': { name: 'Predator\'s Scent', type: 'buff', stat: 'biteForce', amount: [5, 10, 15, 20, 25], duration: [3, 3, 4, 4, 5] },
+                'schoolingTactics': { name: 'Schooling Tactics', type: 'buff', stat: 'all', amount: [5, 10, 15, 20, 25], duration: [3, 3, 4, 4, 5] },
+                'murkyWaters': { name: 'Murky Waters', type: 'debuff', effect: 'weaken', power: [0.9, 0.85, 0.8, 0.75, 0.7], duration: [2, 2, 3, 3, 4] },
+                'weakenScales': { name: 'Weaken Scales', type: 'debuff', effect: 'armorBreak', amount: [5, 8, 12, 16, 20], duration: [2, 3, 3, 4, 4] },
+                'treasureGlimmer': { name: 'Treasure Glimmer', type: 'utility', effect: 'findShells', duration: [3, 4, 5, 6, 7], minLuminescence: 18 },
+                'amphibiousGrace': { name: 'Amphibious Grace', type: 'utility', effect: 'freshwaterSpeed', duration: [2, 3, 4, 5, 6], minFinSpeed: 20 },
+                'abyssalSight': { name: 'Abyssal Sight', type: 'utility', effect: 'deepMagicFind', duration: [3, 4, 5, 6, 7], minLuminescence: 25 },
+                'echolocation': { name: 'Echolocation', type: 'buff', stat: 'lateralLine', amount: [10, 15, 20, 25, 30], duration: [2, 3, 4, 5, 6], effect: 'dodge' },
+                'vortex': { name: 'Vortex', type: 'buff', stat: 'finSpeed', effect: 'statDouble', duration: [1, 2, 3, 5, 8], minFinSpeed: 20 },
+                'symbioticBond': { name: 'Symbiotic Bond', type: 'utility', effect: 'symbiontBoost', duration: [3, 4, 5, 6, 7], minInstinct: 20 },
+                'radiantVibes': { name: 'Radiant Vibes', type: 'buff', effect: 'luminescenceDefense', duration: [1, 2, 3, 5, 8], minLuminescence: 15 },
+                'divineCurrent': { name: 'Divine Current', type: 'buff', stat: 'instinct', effect: 'statDouble', duration: [2, 3, 5, 8, 11], minInstinct: 18 }
+            },
+            consumables: {
+                'Shell_Paste': {
+                    name: 'Hardened Shell Paste',
+                    recipe: { 'Barnacle Cluster': 2, 'Crab Carapace': 2, 'Urchin Spine': 1 },
+                    effect: { type: 'buff', stat: 'scaleHardness', amount: 20, duration: 4, name: 'Hardened Shell Paste' }
+                },
+                'Sharpened_Claw': {
+                    name: 'Sharpened Claw Tip',
+                    recipe: { 'Lobster Claw': 1, 'Sea Glass': 2, 'Shark Tooth': 1 },
+                    effect: { type: 'buff', stat: 'biteForce', amount: 20, duration: 4, name: 'Sharpened Claw Tip' }
+                },
+                'Conch_Horn': {
+                    name: 'Conch War Horn',
+                    recipe: { 'Sunken Doubloon': 1, 'Driftwood': 2, 'Fish Hook': 1 },
+                    effect: { type: 'combat', power: 3.0, duration: 1, name: 'Conch War Horn' }
+                },
+                'Mermaid_Charm': {
+                    name: 'Mermaid\'s Charm',
+                    recipe: { 'Mermaid\'s Purse': 1, 'Polished Pebble': 4, 'Trilobite Fossil': 1 },
+                    effect: { type: 'utility', effect: 'magicFind', duration: 10, name: 'Mermaid\'s Charm' }
+                },
+                'Crab_Shield': {
+                    name: 'Crab Shell Shield',
+                    recipe: { 'Crab Carapace': 3, 'Driftwood': 2 },
+                    effect: { type: 'buff', stat: 'scaleHardness', amount: 30, duration: 2, name: 'Crab Shell Shield' }
+                },
+                'Moon_Elixir': {
+                    name: 'Sand Dollar Elixir',
+                    recipe: { 'Sand Dollar': 2, 'Coral Fragment': 3, 'Bioluminescent Algae': 1 },
+                    effect: { type: 'buff', stat: 'instinct', amount: 50, duration: 10, name: 'Sand Dollar Elixir' }
+                },
+                'Kelp_Fan': {
+                    name: 'Kelp Fan',
+                    recipe: { 'Twisted Kelp': 4, 'Shipwreck Splinter': 2 },
+                    effect: { type: 'buff', stat: 'finSpeed', amount: 50, duration: 5, name: 'Kelp Fan' }
+                },
+                'Glimmer_Powder': {
+                    name: 'Glimmering Powder',
+                    recipe: { 'Sea Glass': 3, 'Polished Pebble': 2, 'Bioluminescent Algae': 2 },
+                    effect: { type: 'buff', stat: 'luminescence', amount: 30, duration: 6, name: 'Glimmering Powder' }
+                },
+                'Urchin_Spike_Barrier': {
+                    name: 'Urchin Spike Barrier',
+                    recipe: { 'Urchin Spine': 4, 'Crab Carapace': 2, 'Barnacle Cluster': 2 },
+                    effect: { type: 'buff', stat: 'scaleHardness', amount: 10, duration: 5, name: 'Urchin Spike Barrier', effect: 'thorns' }
+                },
+                'Shark_Tooth_Amulet': {
+                    name: 'Shark Tooth Amulet',
+                    recipe: { 'Shark Tooth': 3, 'Sunken Doubloon': 1, 'Sea Glass': 1 },
+                    effect: { type: 'buff', stat: 'biteForce', amount: 30, duration: 5, name: 'Shark Tooth Amulet' }
+                },
+                'Algae_Poultice': {
+                    name: 'Algae Poultice',
+                    recipe: { 'Bioluminescent Algae': 4, 'Twisted Kelp': 2, 'Polished Pebble': 3 },
+                    effect: { type: 'buff', stat: 'lateralLine', amount: 25, duration: 8, name: 'Algae Poultice' }
+                },
+                'Leviathans_Draught': {
+                    name: 'Leviathan\'s Draught',
+                    recipe: { 'Shark Tooth': 5, 'Lobster Claw': 3, 'Trilobite Fossil': 1 },
+                    effect: { type: 'buff', stat: 'biteForce', amount: 100, duration: 5, name: 'Leviathan\'s Draught' }
+                },
+                'Aegis_Potion': {
+                    name: 'Aegis Potion',
+                    recipe: { 'Crab Carapace': 5, 'Barnacle Cluster': 5, 'Shipwreck Splinter': 3 },
+                    effect: { type: 'buff', stat: 'scaleHardness', amount: 100, duration: 5, name: 'Aegis Potion' }
+                },
+                'Oracle_Brew': {
+                    name: 'Deep Oracle\'s Brew',
+                    recipe: { 'Bioluminescent Algae': 5, 'Message in a Bottle': 1, 'Coral Fragment': 3 },
+                    effect: { type: 'buff', stat: 'all', amount: 25, duration: 8, name: 'Deep Oracle\'s Brew' }
+                },
+                'Tidal_Essence': {
+                    name: 'Tidal Essence',
+                    recipe: { 'Bioluminescent Algae': 3, 'Coral Fragment': 2, 'Message in a Bottle': 1 },
+                    effect: { type: 'utility', effect: 'xp_boost', duration: 6, name: 'Tidal Essence' }
+                },
+                'Seabed_Resin': {
+                    name: 'Seabed Resin',
+                    recipe: { 'Barnacle Cluster': 3, 'Twisted Kelp': 3, 'Driftwood': 1 },
+                    effect: { type: 'utility', effect: 'repair', name: 'Seabed Resin' }
+                },
+                'Blood_Vial': {
+                    name: 'Blood Vial',
+                    recipe: { 'Shark Tooth': 2, 'Lobster Claw': 2, 'Sunken Doubloon': 1 },
+                    effect: { type: 'buff', duration: 5, name: 'Blood Vial', effect: 'lure' }
+                }
+            },
+            worldEvents: {
+                'Plankton_Bloom': {
+                    name: 'Plankton Bloom',
+                    description: 'The water is thick with life! XP from all sources is increased by 20%.',
+                    duration: 6, // in tasks
+                    effects: { xpModifier: 1.2 }
+                },
+                'Red_Tide': {
+                    name: 'Red Tide',
+                    description: 'A toxic algae bloom makes combat tougher, but the rewards are greater. Enemies are 10% stronger, but loot drops are more common.',
+                    duration: 7,
+                    effects: { enemyPowerModifier: 1.1, lootChanceModifier: 1.2 }
+                },
+                'Shark_Migration': {
+                    name: 'Shark Migration',
+                    description: 'Large predators are on the move!',
+                    duration: 5,
+                    effects: { minEnemyLevelBonus: 1 }
+                },
+                'Jellyfish_Swarm': {
+                    name: 'Jellyfish Swarm',
+                    description: 'A massive swarm of jellyfish makes travel slow and difficult.',
+                    duration: 7,
+                    effects: { travelDurationModifier: 1.5 }
+                },
+                'Strong_Gale': {
+                    name: 'Strong Gale',
+                    description: 'Strong currents propel you faster through the water! Travel is quicker and more frequent.',
+                    duration: 9,
+                    effects: { travelDurationModifier: 0.5 }
+                },
+                'Volcanic_Rift': {
+                    name: 'Volcanic Rift',
+                    description: 'A tear in the seabed leaks strange energies. Magic items are easier to find, but foes are stronger.',
+                    duration: 5,
+                    effects: { magicFindChance: 0.15, enemyLevelModifier: 2 }
+                },
+                'Bioluminescent_Event': {
+                    name: 'Bioluminescent Event',
+                    description: 'The water glows with an ethereal light, enhancing magical understanding.',
+                    duration: 6,
+                    effects: { spellLearnChance: 0.25 }
+                },
+                'Seabed_Tremor': {
+                    name: 'Seabed Tremor',
+                    description: 'The ocean floor rumbles, shaking loose shells and sharpening your senses.',
+                    duration: 6,
+                    effects: { shellsBonus: 1.5, lateralLineBonus: 15 }
+                }
+            },
+            reputationTiers: {
+                'Despised': { min: -20, max: -15, color: 'text-red-700' },
+                'Unfriendly': { min: -14, max: -5, color: 'text-red-400' },
+                'Neutral': { min: -4, max: 4, color: 'text-gray-400' },
+                'Friendly': { min: 5, max: 14, color: 'text-green-400' },
+                'Honored': { min: 15, max: 20, color: 'text-green-600' }
+            },
+            emojis: {
+                fight: '⚔️', quest: '🧭', travel: '⛵️', returnToMarket: '🪸', sellLoot: '💰', buyGear: '🛍️', learnSpell: '🔮',
+                shells: '🐚', loot: '💎', equipment: '🛡️', xp: '✨', arrival: '⚓', levelUp: '🎉',
+                winFight: '🏆', loseFight: '💀', repUp: '📈', repDown: '📉', craft: '🛠️', consumable: '🧪', questFail: '⁉️',
+                worldEvent: '🌍', merchant: '🐳', boss: '🔱', miniBoss: '🦈', seal: '🦭', strongGale: '🌬️', spores:'🫧', repair: '🔨', turtle: '🐢',
+                jellyfish: '🪼', beaver: '🦫', eagle: '🦅', octopus: '🐙', lobster: '🦞', starfish: '⭐', crab: '🦀', dolphin: '🐬',
+                otter: '🦦', swan: '🦢', duck: '🦆', squid: '🦑', shrimp: '🦐', blowfish: '🐡'
+            },
+            fishFacts: [
+                "A group of fish is called a school or a shoal.", "Fish have been on the earth for more than 450 million years.", "There are over 30,000 known species of fish.", "Fish are cold-blooded, which means their internal body temperature changes as the surrounding temperature changes.", "Fish use a series of muscles on either side of their backbone to flex their bodies back and forth, creating a wave-like motion to propel them through the water.", "The lateral line is a sensory organ that helps fish detect movement and pressure changes in the surrounding water.", "Some fish, like the clownfish, can change their sex.", "The pufferfish can inflate its body to several times its normal size to ward off predators.", "The oldest known fish, the coelacanth, was thought to be extinct for 65 million years until it was rediscovered in 1938.", "The whale shark is the largest fish in the world, growing up to 60 feet long.", "The smallest fish in the world is the Paedocypris progenetica, which is about the size of a large mosquito.", "Some fish, like the mudskipper, can live out of water for long periods of time and can even climb trees.", "The electric eel can generate a shock of up to 600 volts.", "The sailfish is the fastest fish in the world, reaching speeds of up to 68 miles per hour.", "Fish have a specialized organ called a swim bladder that allows them to control their buoyancy.", "Most fish reproduce by laying eggs, though some, like the great white shark, give birth to live young.", "The archerfish can spit a stream of water to knock insects off of leaves and into the water.", "The stonefish is the most venomous fish in the world.", "The flying fish can glide for up to 650 feet through the air.", "The anglerfish uses a bioluminescent lure to attract prey in the deep sea.", "The parrotfish creates a mucus cocoon to sleep in at night, which protects it from predators.", "The seahorse is the only fish where the male carries the eggs and gives birth.", "The Greenland shark can live for over 500 years, making it the longest-living vertebrate.", "The four-eyed fish has eyes that are split in two, allowing it to see both above and below the water at the same time.", "The sarcastic fringehead is a fish with a massive mouth that it uses to fight off rivals.", "The hagfish can produce a large amount of slime to defend itself from predators.", "The lungfish can survive for years out of water by burying itself in the mud and creating a mucus cocoon.", "The flashlight fish has a bioluminescent organ under its eye that it can turn on and off.", "The cleaner wrasse sets up cleaning stations where larger fish come to have parasites removed.", "The leafy seadragon is a master of camouflage, blending in perfectly with its seaweed environment.", "The mola mola, or ocean sunfish, is the heaviest bony fish in the world.", "The candiru is a parasitic catfish that is known to swim into the gills of larger fish.", "The barreleye fish has a transparent head and tubular eyes that can rotate to look upwards.", "The sheepshead fish has human-like teeth that it uses to crush the shells of its prey.", "The cookiecutter shark takes circular bites out of its prey, leaving a crater-like wound.", "The frilled shark is a living fossil with a long, eel-like body and rows of sharp teeth.", "The goblin shark has a long, protruding snout and a jaw that can extend to catch prey.", "The vampire squid has the largest eyes relative to its body size of any animal.", "The oarfish is the longest bony fish in the world, reaching lengths of up to 36 feet.", "The tripod fish has long, stilt-like fins that it uses to stand on the seafloor.", "The blobfish has a gelatinous body that allows it to withstand the immense pressure of the deep sea.", "The icefish has no red blood cells and its blood is clear, allowing it to survive in the freezing waters of the Antarctic.", "The glass catfish has a transparent body, making its organs and skeleton visible.", "The blind cavefish has no eyes and navigates using its lateral line.", "The climbing perch can walk on land and climb trees using its spiny gill covers.", "The elephantnose fish has a long, trunk-like appendage that it uses to find food in the mud.", "The knifefish produces a weak electric field to navigate and find prey in murky waters.", "The paddlefish has a long, paddle-like snout that it uses to detect swarms of plankton.", "The pinecone fish has large, armor-like scales and a bioluminescent organ on its lower jaw.", "The red-lipped batfish has bright red lips and uses its fins to walk on the seafloor.", "The stargazer fish buries itself in the sand and has its eyes on top of its head to ambush prey.", "The wolffish has strong jaws and canine-like teeth that it uses to crush hard-shelled prey.", "The zebrafish has the ability to regenerate its heart, fins, and even parts of its brain.", "The Atlantic cod has a barbel on its chin that it uses to find food on the ocean floor.", "The bluefin tuna is one of the fastest and most powerful fish in the ocean.", "The swordfish uses its long, sword-like bill to slash at prey.", "The flounder is a flatfish that has both of its eyes on one side of its head.", "The halibut is the largest flatfish in the world, growing up to 8 feet long.", "The mahi-mahi can change its color when it gets excited.", "The redfish is known for the distinctive black spot on its tail.", "The snapper has sharp, canine-like teeth.", "The tarpon is known for its acrobatic leaps out of the water.", "The wahoo is one of the fastest fish in the sea, known for its long, hard runs.", "The yellowfin tuna is a popular game fish known for its speed and strength.", "The giant sea bass can live for over 70 years.", "The goliath grouper can weigh over 800 pounds.", "The jewfish is another name for the goliath grouper.", "The lingcod is a voracious predator with a large mouth and sharp teeth.", "The rockfish can live for over 200 years.", "The sheepshead has teeth that look remarkably like human teeth.", "The triggerfish has a spine on its dorsal fin that it can lock into place.", "The trumpetfish has a long, slender body and a tube-like snout.", "The unicornfish has a horn-like appendage on its forehead.", "The viperfish has long, needle-like teeth and a hinged jaw.", "The lanternfish is one of the most abundant fish in the ocean, with a bioluminescent body.", "The hatchetfish has a thin, hatchet-shaped body and large, upward-facing eyes.", "The dragonfish has a bioluminescent lure on its chin to attract prey.", "The fangtooth has the largest teeth in proportion to its body size of any fish.", "The black swallower can swallow prey much larger than itself.", "The bristlemouth is the most abundant vertebrate on Earth.", "The cusk-eel is a deep-sea fish with a long, eel-like body.", "The grenadier is also known as a rattail due to its long, tapering tail.", "The pearlfish lives inside the body of a sea cucumber.", "The snailfish is the deepest-living fish in the ocean, found at depths of over 26,000 feet.", "The spookfish has mirror-like eyes that allow it to see both up and down at the same time.", "The telescopefish has large, forward-facing eyes that give it binocular vision.", "The tube-eye has long, tubular eyes that are fixed in an upward gaze.", "The whalefish has a large mouth and a flabby, whale-like body.", "The Atlantic salmon can leap up to 12 feet in the air to get over waterfalls.", "The brown trout is a popular game fish known for its cunning and fighting ability.", "The rainbow trout is known for its beautiful, iridescent colors.", "The brook trout is the state freshwater fish of nine U.S. states.", "The lake trout is the largest of the char species.", "The largemouth bass is the most popular game fish in the United States.", "The smallmouth bass is known for its fighting ability and is often called a \"bronzeback.\"", "The northern pike is a voracious predator with a long, slender body and a mouthful of sharp teeth.", "The muskellunge is the largest member of the pike family and is known as the \"fish of 10,000 casts.\"", "The walleye has large, glassy eyes that allow it to see well in low-light conditions.", "The yellow perch is a popular panfish known for its delicious taste.", "The bluegill is a common sunfish found in lakes and ponds across North America.", "The crappie is another popular panfish, known for its large, paper-thin mouth.", "The catfish has whisker-like barbels around its mouth that it uses to find food.", "The carp is a hardy fish that can tolerate a wide range of water conditions.", "The sturgeon is a prehistoric-looking fish with a cartilaginous skeleton and rows of bony plates.", "The paddlefish has a long, paddle-like snout that is covered in electroreceptors.", "The alligator gar is a large, predatory fish with a long, alligator-like snout and a mouthful of sharp teeth."
+            ]
+        };
+        // Unify monsters and races
+        config.monsters.names = [...config.races];
+        
+        const statDisplayNames = {
+            'biteForce': 'Bite Force',
+            'finSpeed': 'Fin Speed',
+            'scaleHardness': 'Scale Hardness',
+            'lateralLine': 'Lateral Line',
+            'instinct': 'Instinct',
+            'luminescence': 'Luminescence'
+        };
+
+        const factionDisplayNames = {
+            'Crustacean': 'Crustaceans',
+            'Mollusk': 'Mollusks',
+            'Mammal': 'Mammals',
+            'Bird': 'Birds',
+            'Echinoderm': 'Echinoderms',
+            'Other': 'Others'
+        };
+
+        // --- GAME STATE ---
+        let player = {};
+        let gameInterval;
+        let factInterval;
+        let devModeActive = false;
+        let currentWorldEvent = null;
+        let seamusEncounteredThisVisit = false;
+        let justLostFight = false;
+        let currentTask = {
+            description: 'Starting adventure...',
+            duration: 5000,
+            progress: 0,
+            type: 'idle'
+        };
+        let playtime = 0;
+        let tickRate = config.BASE_TICK_RATE;
+        let maxTravelDistance = 0; // Will be calculated on init
+
+        // --- DOM ELEMENTS ---
+        let dom = {};
+
+        // --- HELPER FUNCTIONS ---
+        const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        function formatPlaytime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            const pad = (num) => num.toString().padStart(2, '0');
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        // --- LOGGING ---
+        function logMessage(message, type = 'default') {
+            const p = document.createElement('p');
+            let emoji = config.emojis[type] || '💧';
+            let colorClass = 'text-gray-400';
+            
+            // Handle special encounter emoji separately
+            if (type === 'specialEncounter' && currentTask.enemyEmoji) {
+                emoji = config.emojis[currentTask.enemyEmoji];
+            } else {
+                switch (type) {
+                    case 'returnToMarket': case 'sellLoot': case 'buyGear': case 'shells': colorClass = 'text-yellow-400'; break;
+                    case 'merchant': colorClass = 'text-blue-300'; break;
+                    case 'repair':
+                    case 'turtle':
+                        colorClass = 'text-green-300'; break;
+                    case 'learnSpell': colorClass = 'text-pink-400'; break;
+                    case 'craft': case 'consumable': colorClass = 'text-purple-400'; break;
+                    case 'questFail': colorClass = 'text-red-600'; break;
+                    case 'worldEvent': colorClass = 'text-yellow-300'; break;
+                    case 'winFight': colorClass = 'text-green-400'; break;
+                    case 'loseFight': case 'boss': colorClass = 'text-red-400'; break;
+                    case 'miniBoss': case 'specialEncounter': colorClass = 'text-orange-400'; break;
+                    case 'jellyfish': case 'seal': case 'dolphin': case 'otter': case 'swan': case 'duck': case 'squid': case 'shrimp': case 'blowfish': colorClass = 'text-cyan-200'; break;
+                    case 'crab': colorClass = 'text-orange-300'; break;
+                    case 'levelUp': colorClass = 'text-yellow-300'; break;
+                    case 'strongGale': colorClass = 'text-blue-200'; break;
+                }
+            }
+            
+            p.innerHTML = `${emoji} ${message}`;
+            p.className = `text-sm ${colorClass} mb-1 log-message`;
+            dom.log.prepend(p);
+        }
+        
+        // --- CHARACTER & ITEM GENERATION ---
+        function generateLoot() {
+            const baseItemName = getRandom(Object.keys(config.loot));
+            const baseItemData = config.loot[baseItemName];
+            return { name: baseItemName, value: baseItemData.value, weight: 1 };
+        }
+        
+        function calculateItemScore(item) {
+            if (!item || item.name === 'None' || item.isBroken) return 0;
+
+            const preferredStats = config.classBonuses[player.class] || [];
+            let score = 0;
+
+            // Primary bonus - synergy removed from here
+            let primaryWeight = 1;
+            // For 'all' stat items like some symbionts/legendaries
+            if (item.primaryStat === 'all') primaryWeight = 1.2; 
+            score += item.bonus * primaryWeight;
+
+            // Magical bonus - synergy only applies here now
+            if (item.magicalBonus) {
+                let magicalWeight = preferredStats.includes(item.magicalBonus.stat) ? 1.5 : 1;
+                if (item.magicalBonus.stat === 'all') magicalWeight = 1.2;
+                score += item.magicalBonus.amount * magicalWeight;
+            }
+
+            return score;
+        }
+
+        function shouldEquip(newItem) {
+            const currentItem = player.equipment[newItem.slot];
+            const newItemScore = calculateItemScore(newItem);
+            const currentItemScore = calculateItemScore(currentItem);
+
+            return newItemScore > currentItemScore;
+        }
+        
+        function getSymbiontStatTotal(symbiont) {
+            if (!symbiont || symbiont.name === 'None') return 0;
+
+            let total = 0;
+            let effectiveBonus = symbiont.bonus;
+            let effectiveMagicalAmount = symbiont.magicalBonus ? symbiont.magicalBonus.amount : 0;
+
+            if (player.class === 'Grove Tender') {
+                effectiveBonus *= 1.5;
+                effectiveMagicalAmount *= 1.5;
+            }
+
+            if (symbiont.primaryStat === 'all') {
+                // 'all' affects all 6 stats, so we weight it highly
+                total += effectiveBonus * 6;
+            } else {
+                total += effectiveBonus;
+            }
+
+            if (symbiont.magicalBonus && symbiont.magicalBonus.amount) {
+                if (symbiont.magicalBonus.stat === 'all') {
+                    total += effectiveMagicalAmount * 6;
+                } else {
+                    total += effectiveMagicalAmount;
+                }
+            }
+            return total;
+        }
+
+
+        function generateEquipment(forceTier = null, forceSlot = null, options = {}) {
+            const availableSlots = Object.keys(config.equipment.bases);
+            const slot = forceSlot || getRandom(availableSlots);
+            
+            if (forceTier === 'Legendary') {
+                const tier = config.equipment.tiers.Legendary;
+                const bossData = config.bosses[options.bossKey];
+                if (!bossData) return null;
+
+                let primaryStat, magicalBonus = null, bonus, name = `Legacy of ${bossData.name.split(',')[0]}`;
+
+                if (forceSlot === 'symbiont') {
+                    primaryStat = 'all';
+                    const baseSymbiontBonus = 5;
+                    const variance = randomInt(-2, 2);
+                    bonus = Math.max(1, baseSymbiontBonus + variance) + Math.floor(player.level / 10);
+                } else {
+                    primaryStat = config.equipment.slotStats[forceSlot];
+                    const variance = randomInt(-2, 2);
+                    bonus = Math.max(1, tier.bonus + variance) + Math.floor(player.level / 5);
+                }
+                return { slot: forceSlot, name, primaryStat, bonus, magicalBonus, tier: 'Legendary' };
+            }
+
+            let tierKey = forceTier;
+            if (!tierKey) {
+                const playerLevel = player.level || 1;
+                const availableTiers = Object.keys(config.equipment.tierWeights).filter(tierName => playerLevel >= (config.equipment.tiers[tierName].levelReq || 0));
+                const weights = {};
+                let totalWeight = 0;
+                
+                for (const tierName of availableTiers) {
+                    const tierData = config.equipment.tierWeights[tierName];
+                    const adjustedWeight = Math.max(1, tierData.weight + (tierData.factor * playerLevel));
+                    weights[tierName] = adjustedWeight;
+                    totalWeight += adjustedWeight;
+                }
+
+                let randomRoll = Math.random() * totalWeight;
+                for (const tierName in weights) {
+                    if (randomRoll < weights[tierName]) { tierKey = tierName; break; }
+                    randomRoll -= weights[tierName];
+                }
+                if (!tierKey) tierKey = availableTiers[0] || 'Basic';
+            }
+            const tier = config.equipment.tiers[tierKey];
+            const variance = randomInt(-2, 2);
+            let bonus = Math.max(1, tier.bonus + variance) + Math.floor(player.level / 10);
+            let name, base, primaryStat, magicalBonus = null, isMagical = false;
+            let maxDurability = tier.value * 10;
+
+            if (slot === 'symbiont') {
+                base = getRandom(config.equipment.bases.symbiont);
+                const symbiontData = config.equipment.symbiontStats[base];
+                primaryStat = symbiontData.primaryStat;
+                name = `${getRandom(tier.adjectives)} ${base}`;
+                if (symbiontData.secondaryStat) {
+                    const halfBonus = Math.ceil(bonus / 2);
+                    bonus = halfBonus;
+                    magicalBonus = { stat: symbiontData.secondaryStat, amount: halfBonus };
+                }
+            } else {
+                base = getRandom(config.equipment.bases[slot]);
+                primaryStat = config.equipment.slotStats[slot];
+                name = `${getRandom(tier.adjectives)} ${base}`;
+                let magicFindChance = 0.15 + (player.class === 'Deep Seer' ? 0.1 : 0);
+                if (player.activeBuffs.some(b => b.effect && b.effect === 'magicFind')) magicFindChance = 0.4;
+                if (player.activeBuffs.some(b => b.effect && b.effect === 'deepMagicFind')) {
+                    const locationEffects = config.locations.effects[player.currentLocation];
+                    if (locationEffects && locationEffects.maxEnemyLevel >= 3) magicFindChance += 0.2;
+                }
+                if (currentWorldEvent && currentWorldEvent.key === 'Volcanic_Rift' && currentWorldEvent.effects.magicFindChance) {
+                    magicFindChance += currentWorldEvent.effects.magicFindChance;
+                }
+
+                if (Math.random() < magicFindChance) {
+                    isMagical = true;
+                    name = `${getRandom(config.equipment.magicalAdjectives)} ${name}`;
+                    let secondaryStat = getRandom(Object.keys(player.stats));
+                    magicalBonus = { stat: secondaryStat, amount: Math.ceil(bonus / 2) };
+                }
+            }
+            if (isMagical) maxDurability = Math.floor(maxDurability * 1.35);
+
+            return { slot, name, primaryStat, bonus, magicalBonus, tier: tierKey, durability: maxDurability, maxDurability, isBroken: false };
+        }
+
+        function generateCharacter() {
+            const race = getRandom(config.races);
+            const pClass = getRandom(config.classes);
+            const baseStats = { biteForce: randomInt(3, 13), finSpeed: randomInt(3, 13), scaleHardness: randomInt(3, 13), lateralLine: randomInt(3, 13), instinct: randomInt(3, 13), luminescence: randomInt(3, 13) };
+            const bonuses = config.raceBonuses[race];
+            if (bonuses) for (const stat in bonuses) if (baseStats.hasOwnProperty(stat)) baseStats[stat] += bonuses[stat];
+
+            player = {
+                name: getRandom(config.names), race, class: pClass, level: 1, xp: 0, nextLevelXp: 420, shells: 0, encumbrance: 0,
+                inventory: {}, consumables: {}, spellbook: {}, activeBuffs: [], defeatedBosses: [], stats: baseStats,
+                currentLocation: 'Narragansett Bay',
+                reputation: { Bird: 0, Mammal: 0, Crustacean: 0, Mollusk: 0, Echinoderm: 0 },
+                level20Timestamp: null,
+                equipment: {
+                    mouth: { name: 'Basic Gnashers', primaryStat: 'biteForce', bonus: 1, tier: 'Basic', magicalBonus: null, isBroken: false },
+                    dorsalFin: { name: 'Simple Fin', primaryStat: 'finSpeed', bonus: 1, tier: 'Basic', magicalBonus: null, isBroken: false },
+                    cranialPlate: { name: 'Bony Head', primaryStat: 'scaleHardness', bonus: 1, tier: 'Basic', magicalBonus: null, isBroken: false },
+                    scales: { name: 'Plain Scales', primaryStat: 'scaleHardness', bonus: 1, tier: 'Basic', magicalBonus: null, isBroken: false },
+                    tailFin: { name: 'Simple Caudal Fin', primaryStat: 'finSpeed', bonus: 1, tier: 'Basic', magicalBonus: null, isBroken: false },
+                    symbiont: { name: 'None', primaryStat: 'instinct', bonus: 0, tier: 'Basic', magicalBonus: null, isBroken: false }
+                }
+            };
+            playtime = 0;
+            if (player.class === 'Ink Ranger') player.spellbook['inkCloud'] = 1;
+        }
+
+        function getStatComponents(statName) {
+            let base = player.stats[statName];
+            let buff = 0;
+            for (const slot in player.equipment) {
+                const item = player.equipment[slot];
+                // Check if item exists and has durability, or doesn't have durability (like basic items)
+                if (item && item.name !== 'None') {
+                    let effectiveBonus = item.bonus;
+                    let effectiveMagicalBonus = item.magicalBonus;
+
+                    if (item.isBroken) {
+                        effectiveBonus = Math.ceil(item.bonus / 2);
+                        effectiveMagicalBonus = null; // Magical bonus disabled when broken
+                    }
+                    
+                    let itemBonus = effectiveBonus;
+                    let magicalAmount = effectiveMagicalBonus ? effectiveMagicalBonus.amount : 0;
+                    
+                    if (player.class === 'Grove Tender' && slot === 'symbiont') {
+                         itemBonus = Math.ceil(itemBonus * 1.5);
+                         magicalAmount = Math.ceil(magicalAmount * 1.5);
+
+                         // Add the additional random magical bonus for Grove Tender
+                         const nameSum = item.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                         const allStats = Object.keys(player.stats);
+                         const randomBonusStat = allStats[nameSum % allStats.length];
+                         if (statName === randomBonusStat) {
+                             const additionalBonus = Math.ceil(item.bonus * 0.25); // Based on original bonus
+                             base += additionalBonus;
+                         }
+                    }
+
+                    if (player.activeBuffs.some(b => b.effect && b.effect === 'symbiontBoost') && slot === 'symbiont') { 
+                        itemBonus *= 2; 
+                        magicalAmount *= 2; 
+                    }
+                    
+                    if (item.primaryStat === statName || item.primaryStat === 'all') base += itemBonus;
+                    if (effectiveMagicalBonus && (effectiveMagicalBonus.stat === statName || effectiveMagicalBonus.stat === 'all')) base += magicalAmount;
+                }
+            }
+            player.activeBuffs.forEach(b => {
+                if (b.stat === statName || b.stat === 'all') buff += b.amount;
+                if (b.effect && b.effect === 'statDouble' && b.stat === statName) buff += base;
+            });
+            return { base, buff, total: base + buff };
+        }
+
+        function getStat(statName) { return getStatComponents(statName).total; }
+        
+        // --- UI UPDATES ---
+        function getReputationTier(value) {
+            for (const tier in config.reputationTiers) {
+                const { min, max } = config.reputationTiers[tier];
+                if (value >= min && value <= max) return { name: tier, ...config.reputationTiers[tier] };
+            }
+            if (value < -20) return { name: 'Despised', ...config.reputationTiers['Despised']};
+            if (value > 20) return { name: 'Honored', ...config.reputationTiers['Honored']};
+            return { name: 'Neutral', ...config.reputationTiers['Neutral'] };
+        }
+
+        function updateReputationUI() {
+            dom.reputationList.innerHTML = '';
+            for (const faction in player.reputation) {
+                const repValue = player.reputation[faction];
+                const tier = getReputationTier(repValue);
+                const displayName = factionDisplayNames[faction] || faction;
+                const li = document.createElement('li');
+                li.innerHTML = `<div class="flex justify-between items-center"><span>${displayName}</span><span class="font-bold ${tier.color}">${tier.name} (${repValue})</span></div>`;
+                dom.reputationList.appendChild(li);
+            }
+        }
+
+        function updateConsumablesUI() {
+            dom.consumableList.innerHTML = '';
+            const consumableKeys = Object.keys(player.consumables).filter(k => player.consumables[k] > 0);
+            if (consumableKeys.length === 0) {
+                dom.consumableList.innerHTML = '<li>None</li>';
+            } else {
+                consumableKeys.forEach(key => {
+                    const consumable = config.consumables[key];
+                    const count = player.consumables[key];
+                    const li = document.createElement('li');
+                    li.textContent = `${consumable.name} (x${count})`;
+                    dom.consumableList.appendChild(li);
+                });
+            }
+        }
+
+        function updateUI() {
+            if (!player || !player.stats) return;
+            const maxEncumbrance = Math.floor(20 + getStat('scaleHardness') * 0.5);
+            dom.characterName.textContent = player.name;
+            dom.characterRaceClass.innerHTML = `${player.race} <span class="text-base text-gray-500">${player.class}</span>`;
+            dom.playtime.textContent = formatPlaytime(playtime);
+            
+            if (player.level20Timestamp) {
+                dom.level20Time.textContent = `${formatPlaytime(player.level20Timestamp)}`;
+            } else {
+                dom.level20Time.textContent = '';
+            }
+
+            const displayLocation = player.currentLocation === 'Narragansett Bay' ? 'Spawning Grounds' : player.currentLocation;
+            dom.currentLocationDisplay.textContent = displayLocation;
+            dom.currentLocationDisplay.className = `text-sm font-medium ${config.locations.effects[player.currentLocation]?.color || 'text-gray-400'}`;
+
+
+            Object.keys(player.stats).forEach(stat => {
+                const components = getStatComponents(stat);
+                const key = `stat${stat.charAt(0).toUpperCase() + stat.slice(1)}`;
+                if (dom[key]) {
+                    dom[key].textContent = components.total;
+                    dom[key].className = 'font-bold text-white';
+                    if (components.buff > 0) dom[key].classList.add('text-green-400');
+                    else if (components.buff < 0) dom[key].classList.add('text-red-400');
+                }
+            });
+
+            Object.keys(player.equipment).forEach(slot => {
+                const key = `equip${slot.charAt(0).toUpperCase() + slot.slice(1)}`;
+                if (dom[key]) {
+                    const item = player.equipment[slot];
+                    if (item && item.name !== 'None') {
+                        let tierColor = item.isBroken ? 'text-red-600' : (config.equipment.tiers[item.tier] ? config.equipment.tiers[item.tier].color : 'text-gray-400');
+                        let durabilityIndicator = ''; 
+                        let displayName = item.name;
+
+                        if (slot === 'symbiont' && item.name === 'Sammy the Shrimp') {
+                            displayName = `${config.emojis.shrimp} ${item.name}`;
+                            tierColor = 'text-green-200'; // Set Sammy's color
+                        }
+
+                        // Only show indicator for non-basic, non-legendary items and non-symbionts
+                        if (item.tier !== 'Basic' && item.tier !== 'Legendary' && slot !== 'symbiont') {
+                            if (item.isBroken || item.durability <= 0) {
+                                durabilityIndicator = `<span class="durability-dot bg-red-900" title="Broken"></span>`; 
+                            } else {
+                                const durabilityPercent = (item.durability / item.maxDurability);
+                                let dotColor = 'bg-green-500'; // Good
+                                if (durabilityPercent < 0.3) dotColor = 'bg-red-500'; // Critical
+                                else if (durabilityPercent < 0.7) dotColor = 'bg-yellow-500'; // Damaged
+                                durabilityIndicator = `<span class="durability-dot ${dotColor}" title="${item.durability}/${item.maxDurability}"></span>`;
+                            }
+                        }
+                        
+                        dom[key].innerHTML = `<span class="${tierColor}">${displayName}</span> ${durabilityIndicator}`;
+                    } else {
+                        dom[key].textContent = 'None';
+                        dom[key].className = 'text-gray-400';
+                    }
+                }
+            });
+
+            dom.level.textContent = player.level;
+            dom.currentXp.textContent = player.xp;
+            dom.nextLevelXp.textContent = player.nextLevelXp;
+            dom.xpBar.style.width = `${(player.xp / player.nextLevelXp) * 100}%`;
+            dom.currentAction.textContent = currentTask.description;
+            dom.actionBar.style.width = `${(currentTask.progress / currentTask.duration) * 100}%`;
+            dom.shells.textContent = player.shells;
+            dom.encumbrance.textContent = `${player.encumbrance} / ${maxEncumbrance}`;
+            dom.inventoryList.innerHTML = '';
+            const itemNames = Object.keys(player.inventory);
+            if (itemNames.length === 0) {
+                dom.inventoryList.innerHTML = '<li>Empty</li>';
+            } else {
+                itemNames.forEach(itemName => {
+                    const count = player.inventory[itemName];
+                    if (count > 0) {
+                        const li = document.createElement('li');
+                        li.className = 'truncate';
+                        li.textContent = `${itemName} (x${count})`;
+                        dom.inventoryList.appendChild(li);
+                    }
+                });
+            }
+
+            dom.spellbookList.innerHTML = '';
+            const spellKeys = Object.keys(player.spellbook);
+            if (spellKeys.length === 0) {
+                dom.spellbookList.innerHTML = '<li>None known</li>';
+            } else {
+                spellKeys.forEach(spellKey => {
+                    const spell = config.spells[spellKey];
+                    const level = player.spellbook[spellKey];
+                    const li = document.createElement('li');
+                    li.textContent = `${spell.name} (Lvl ${level})`;
+                    dom.spellbookList.appendChild(li);
+                });
+            }
+
+            updateReputationUI();
+            updateConsumablesUI();
+        }
+
+        // --- GAME LOGIC ---
+        function gainXp(amount) {
+            let finalAmount = Math.floor(amount);
+            
+            const xpBoostBuff = player.activeBuffs.find(b => b.effect === 'xp_boost');
+            if (xpBoostBuff && xpBoostBuff.bonusLevel > 0) {
+                const bonusPercent = xpBoostBuff.bonusLevel * 10;
+                const bonusXp = Math.floor(finalAmount * (bonusPercent / 100));
+                finalAmount += bonusXp;
+                logMessage(`Tidal Essence grants a <span class="font-bold text-yellow-300">${bonusPercent}%</span> XP bonus! (+${bonusXp} XP)`, 'xp');
+            }
+
+            const puffyDebuff = player.activeBuffs.find(b => b.name === "Puffy's Scorn");
+            if (puffyDebuff) {
+                finalAmount = Math.floor(finalAmount * 0.5); // 50% XP reduction
+                logMessage(`Puffy's scorn reduces your XP gain!`, 'blowfish');
+                // Remove the buff after it has been applied once
+                player.activeBuffs = player.activeBuffs.filter(b => b.name !== "Puffy's Scorn");
+            }
+            player.xp += finalAmount;
+            logMessage(`Gained <span class="font-bold text-green-400">${finalAmount} XP</span>.`, 'xp');
+            while (player.xp >= player.nextLevelXp) levelUp();
+        }
+
+        function loseXp(amount) {
+            const xpToLose = Math.floor(amount);
+            player.xp = Math.max(0, player.xp - xpToLose);
+            logMessage(`Lost <span class="font-bold text-red-400">${xpToLose} XP</span>.`, 'xp');
+        }
+
+        function handleSpellLearnEvent(isPurchase = false) {
+            let upgradeChance = 0.3 + (player.class === 'Coral Sculptor' ? 0.3 : 0);
+            if (currentWorldEvent && currentWorldEvent.key === 'Bioluminescent_Event' && currentWorldEvent.effects.spellLearnChance) {
+                upgradeChance += currentWorldEvent.effects.spellLearnChance;
+            }
+
+            const knownSpells = Object.keys(player.spellbook);
+            const upgradableSpells = knownSpells.filter(key => player.spellbook[key] < 5);
+
+            if (upgradableSpells.length > 0 && Math.random() < upgradeChance) {
+                const spellToUpgradeKey = getRandom(upgradableSpells);
+                player.spellbook[spellToUpgradeKey]++;
+                const spellName = config.spells[spellToUpgradeKey].name;
+                const newLevel = player.spellbook[spellToUpgradeKey];
+                logMessage(`Upgraded <span class="font-bold text-pink-400">${spellName}</span> to Level ${newLevel}!`, 'learnSpell');
+                return true;
+            } else {
+                const learnableSpells = Object.keys(config.spells).filter(key => {
+                    const spell = config.spells[key];
+                    const restrictions = config.classRestrictions[player.class] || [];
+                    return !player.spellbook[key] && !restrictions.includes(key) &&
+                           getStat('lateralLine') >= (spell.minLateralLine || 0) &&
+                           getStat('luminescence') >= (spell.minLuminescence || 0) &&
+                           getStat('finSpeed') >= (spell.minFinSpeed || 0) &&
+                           getStat('instinct') >= (spell.minInstinct || 0);
+                });
+
+                if (learnableSpells.length > 0) {
+                    const newSpellKey = getRandom(learnableSpells);
+                    player.spellbook[newSpellKey] = 1;
+                    logMessage(`${isPurchase ? 'Bought a new spell' : 'Learned a new spell'}: <span class="font-bold text-pink-400">${config.spells[newSpellKey].name}</span>!`, 'learnSpell');
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function handleCoraliaLesson() {
+            const spellCost = randomInt(200, 350) * player.level;
+            const upgradableSpells = Object.keys(player.spellbook).filter(key => player.spellbook[key] < 5);
+
+            if (upgradableSpells.length > 0) {
+                if (player.shells >= spellCost) {
+                    player.shells -= spellCost;
+                    const spellToUpgradeKey = getRandom(upgradableSpells);
+                    player.spellbook[spellToUpgradeKey]++;
+                    const spellName = config.spells[spellToUpgradeKey].name;
+                    logMessage(`Coralia's lesson helped you master <span class="font-bold text-pink-400">${spellName}</span>, advancing it to Level ${player.spellbook[spellToUpgradeKey]}! You paid ${spellCost} shells.`, 'learnSpell');
+                } else logMessage(`You cannot afford Coralia's lesson fee of ${spellCost} shells.`, 'merchant');
+                return;
+            }
+
+            const learnableSpells = Object.keys(config.spells).filter(key => {
+                const spell = config.spells[key];
+                const restrictions = config.classRestrictions[player.class] || [];
+                return !player.spellbook[key] && !restrictions.includes(key) &&
+                       getStat('lateralLine') >= (spell.minLateralLine || 0) &&
+                       getStat('luminescence') >= (spell.minLuminescence || 0) &&
+                       getStat('finSpeed') >= (spell.minFinSpeed || 0) &&
+                       getStat('instinct') >= (spell.minInstinct || 0);
+            });
+
+            if (learnableSpells.length > 0) {
+                if (player.shells >= spellCost) {
+                    player.shells -= spellCost;
+                    const newSpellKey = getRandom(learnableSpells);
+                    player.spellbook[newSpellKey] = 1;
+                    logMessage(`With no spells to improve, Coralia teaches you a new one: <span class="font-bold text-pink-400">${config.spells[newSpellKey].name}</span>! You paid ${spellCost} shells.`, 'learnSpell');
+                } else logMessage(`You cannot afford Coralia's lesson fee of ${spellCost} shells.`, 'merchant');
+                return;
+            }
+
+            const consumableKey = getRandom(Object.keys(config.consumables));
+            player.consumables[consumableKey] = (player.consumables[consumableKey] || 0) + 1;
+            logMessage(`You have mastered all possible spells for now. As a reward, Coralia gives you a free <span class="font-bold text-purple-400">${config.consumables[consumableKey].name}</span>!`, 'consumable');
+        }
+
+        function levelUp() {
+            player.level++;
+            if (player.level === 20 && !player.level20Timestamp) {
+                player.level20Timestamp = playtime;
+                logMessage(`Reached Level 20! Your time has been recorded!`, 'levelUp');
+            }
+            player.xp -= player.nextLevelXp;
+            player.nextLevelXp = Math.floor(player.nextLevelXp * 1.3);
+            logMessage(`<span class="font-bold text-yellow-300">LEVEL UP! Reached level ${player.level}!</span>`, 'levelUp');
+            
+            const oldStats = { ...player.stats };
+            Object.keys(player.stats).forEach(stat => player.stats[stat] += randomInt(1, 3));
+            (config.classBonuses[player.class] || []).forEach(stat => player.stats[stat]++);
+            const raceInfo = config.raceBonuses[player.race];
+            if (raceInfo && raceInfo.levelUpBonus) player.stats[raceInfo.levelUpBonus]++;
+
+            Object.keys(player.stats).forEach(stat => {
+                const increase = player.stats[stat] - oldStats[stat];
+                if (increase > 0) {
+                    const key = `stat${stat.charAt(0).toUpperCase() + stat.slice(1)}`;
+                    const statElement = dom[key];
+                    if (statElement && statElement.parentElement) {
+                        const indicator = document.createElement('span');
+                        indicator.className = 'stat-increase-indicator';
+                        indicator.textContent = `+${increase}`;
+                        statElement.parentElement.appendChild(indicator);
+                        setTimeout(() => indicator.remove(), 1900);
+                    }
+                }
+            });
+            logMessage(`Attributes have increased!`);
+            if (Math.random() < (0.05 + (getStat('instinct') * 0.01))) handleSpellLearnEvent(false);
+        }
+
+        function updateBuffs() {
+            let expired = false;
+            // Handle Oscar's special buff first
+            const oscarBuff = player.activeBuffs.find(b => b.name === "Oscar's Luck");
+            if (oscarBuff) {
+                if (Math.random() < 0.30) {
+                    const consumableKey = getRandom(Object.keys(config.consumables));
+                    player.consumables[consumableKey] = (player.consumables[consumableKey] || 0) + 1;
+                    logMessage(`Oscar's luck paid off! You found a <span class="font-bold text-purple-400">${config.consumables[consumableKey].name}</span>!`, 'otter');
+                }
+            }
+
+            player.activeBuffs.forEach(buff => {
+                buff.duration--;
+                if (buff.effect === 'xp_boost' && buff.bonusLevel > 0) {
+                    buff.bonusLevel--;
+                }
+                if (buff.duration <= 0) {
+                    expired = true;
+                    logMessage(`The <span class="font-bold text-purple-400">${buff.name || config.spells[buff.spellKey]?.name || 'A buff'}</span> has worn off.`);
+                }
+            });
+            if (expired) player.activeBuffs = player.activeBuffs.filter(b => b.duration > 0);
+        }
+
+        function completeTask() {
+            // Sammy's 1% chance to leave
+            if (player.equipment.symbiont && player.equipment.symbiont.name === 'Sammy the Shrimp' && Math.random() < 0.01) {
+                logMessage(`'Oh, what's that shiny thing over there?' Sammy the Shrimp seems distracted and wanders off.`, 'shrimp');
+                player.equipment.symbiont = { name: 'None', primaryStat: 'instinct', bonus: 0, tier: 'Basic', magicalBonus: null };
+            }
+
+            updateBuffs();
+            // --- REBALANCE: Filter Feeder ---
+            if (player.class === 'Filter Feeder') {
+                const xpFromFiltering = Math.ceil(player.nextLevelXp * 0.01);
+                gainXp(xpFromFiltering);
+            }
+            if (player.class === 'Grove Tender' && currentTask.type !== 'fight' && Math.random() < 0.2) {
+                const ingredient = getRandom(Object.keys(config.loot));
+                player.inventory[ingredient] = (player.inventory[ingredient] || 0) + 1;
+                player.encumbrance++;
+                logMessage(`Harvested a <span class="font-bold text-cyan-400">${ingredient}</span> from the seabed.`, 'loot');
+            }
+
+            // --- REBALANCE: Spore Drifter (old perk removed) ---
+            // The old perk that gave a stat buff is removed. The new one is in the combat logic.
+
+            if (player.class === 'Coral Sculptor' && Math.random() < 0.05) {
+                const damagedGear = Object.values(player.equipment).filter(item => 
+                    item && item.hasOwnProperty('durability') && item.maxDurability > 0 && (item.durability < item.maxDurability || item.isBroken)
+                );
+
+                if (damagedGear.length > 0) {
+                    const itemToRepair = getRandom(damagedGear);
+                    const repairPercent = randomInt(1, 5) / 100;
+                    const repairAmount = Math.max(1, Math.ceil(itemToRepair.maxDurability * repairPercent));
+                    itemToRepair.durability = Math.min(itemToRepair.maxDurability, itemToRepair.durability + repairAmount);
+                    if (itemToRepair.durability > 0) itemToRepair.isBroken = false;
+                    logMessage(`Your innate connection to the coral has repaired your <span class="font-bold text-cyan-400">${itemToRepair.name}</span> by ${repairAmount} durability!`, 'repair');
+                }
+            }
+
+            switch (currentTask.type) {
+                case 'travel': {
+                    if (player.currentLocation === 'Stillhouse Cove' && currentTask.location !== 'Stillhouse Cove') seamusEncounteredThisVisit = false;
+                    player.currentLocation = currentTask.location;
+                    logMessage(`Arrived at <span class="font-bold ${config.locations.effects[player.currentLocation]?.color || 'text-gray-300'}">${player.currentLocation}</span>.`, 'arrival');
+                    if (Math.random() < 0.4) {
+                        const newItem = generateLoot();
+                        player.inventory[newItem.name] = (player.inventory[newItem.name] || 0) + 1;
+                        player.encumbrance += newItem.weight;
+                        logMessage(`Found <span class="font-bold text-cyan-400">${newItem.name}</span> while exploring!`, 'loot');
+                    }
+                    break;
+                }
+                case 'fight': {
+                    let lureMasterBonusActive = false; // Flag for Lure Master perk
+                    justLostFight = false; // Reset flag before a fight resolves
+                    const locationEffects = config.locations.effects[player.currentLocation] || {};
+                    const isBoss = currentTask.isBoss, isMiniBoss = currentTask.isMiniBoss;
+                    let minLvlMod = locationEffects.minEnemyLevel || 0, maxLvlMod = locationEffects.maxEnemyLevel || 0;
+                    if (currentWorldEvent && currentWorldEvent.effects.minEnemyLevelBonus) minLvlMod += currentWorldEvent.effects.minEnemyLevelBonus;
+                    if (currentWorldEvent && currentWorldEvent.key === 'Volcanic_Rift' && currentWorldEvent.effects.enemyLevelModifier) { minLvlMod += currentWorldEvent.effects.enemyLevelModifier; maxLvlMod += currentWorldEvent.effects.enemyLevelModifier; }
+                    
+                    let enemyLevel;
+
+                    if (currentTask.isJellyfishSwarmEnemy) {
+                        enemyLevel = 1;
+                    } else if (isBoss) {
+                        enemyLevel = 250;
+                    } else if (isMiniBoss) {
+                        enemyLevel = (locationEffects.maxEnemyLevel || player.level) + randomInt(8, 15);
+                    } else {
+                        let minEnemyLvl = player.level + minLvlMod;
+                        const maxEnemyLvl = player.level + maxLvlMod + (player.class === 'Lure Master' ? 4 : 1);
+                        enemyLevel = Math.max(1, randomInt(Math.min(minEnemyLvl, maxEnemyLvl), maxEnemyLvl));
+                    }
+
+                    // --- REBALANCE: Lure Master Perk (Part 1: Buff activation) ---
+                    let tempScaleHardnessBuff = 0;
+                    let tempInstinctBuff = 0;
+                    if (player.class === 'Lure Master' && enemyLevel > player.level) {
+                        const levelDiff = enemyLevel - player.level;
+                        const bonusChance = Math.min(0.5, 0.05 + levelDiff * 0.01); // 5% base + 1% per level diff, max 50%
+                        if (Math.random() < bonusChance) {
+                            lureMasterBonusActive = true;
+                            const buffRoll = Math.random();
+                            const buffAmount = Math.ceil(levelDiff * 1.5);
+                            if (buffRoll < 0.45) { // Scale Hardness
+                                tempScaleHardnessBuff = buffAmount;
+                                logMessage(`Your instincts sharpen against a superior foe, temporarily boosting Scale Hardness!`, 'fight');
+                            } else if (buffRoll < 0.90) { // Instinct
+                                tempInstinctBuff = buffAmount;
+                                logMessage(`Your instincts sharpen against a superior foe, temporarily boosting Instinct!`, 'fight');
+                            } else { // Both
+                                tempScaleHardnessBuff = buffAmount;
+                                tempInstinctBuff = buffAmount;
+                                logMessage(`Your instincts sharpen against a superior foe, temporarily boosting Scale Hardness and Instinct!`, 'fight');
+                            }
+                        }
+                    }
+
+                    
+                    let luremasterModifier = enemyLevel/player.level;
+                    let potentialXpGain = (player.class === 'Lure Master' ? (randomInt(30, 50) + luremasterModifier) * enemyLevel : randomInt(30, 50) * enemyLevel);
+                    if (locationEffects.xpModifier) potentialXpGain *= locationEffects.xpModifier;
+                    if (currentWorldEvent && currentWorldEvent.effects.xpModifier) potentialXpGain *= currentWorldEvent.effects.xpModifier;
+                    if (isBoss) potentialXpGain *= 3; if (isMiniBoss) potentialXpGain *= 2;
+                    const salinityPref = config.raceBonuses[player.race].salinityPreference;
+                    if (locationEffects.salinity === salinityPref) potentialXpGain *= 1.1;
+                    else if (locationEffects.salinity !== 1 && salinityPref !== 1) potentialXpGain *= 0.9;
+                    
+                    let playerPower = getStat('biteForce') + getStat('finSpeed');
+                    let enemyPower = enemyLevel * 11;
+                    let autoWin = false;
+
+                    // --- REBALANCE: Spore Drifter Perk ---
+                    if (player.class === 'Spore Drifter' && Math.random() < 0.20) {
+                        enemyPower *= 0.90;
+                        logMessage(`A cloud of debilitating spores weakens the enemy!`, 'spores');
+                    }
+
+                    if (currentWorldEvent && currentWorldEvent.effects.enemyPowerModifier) enemyPower *= currentWorldEvent.effects.enemyPowerModifier;
+                    if (player.class === 'Kelp Stalker' && Math.random() < 0.25) { const ambushDmg = Math.floor(playerPower * 0.3); enemyPower -= ambushDmg; logMessage(`You ambush from the kelp, dealing <span class="font-bold text-yellow-400">${ambushDmg}</span> initial damage!`, 'fight'); }
+                    if (player.class === 'Abyssal Herald' && Math.random() < 0.2) { enemyPower *= 0.8; logMessage(`Your terrifying presence weakens the enemy!`, 'fight'); }
+                    
+                    { // Scope for consumableKeys
+                        const consumableKeys = Object.keys(player.consumables).filter(k => player.consumables[k] > 0);
+                        if (consumableKeys.length > 0 && Math.random() < 0.40) { 
+                            const keyToUse = getRandom(consumableKeys); 
+                            const consumable = config.consumables[keyToUse]; 
+                            player.consumables[keyToUse]--; 
+                            logMessage(`Used <span class="font-bold text-purple-400">${consumable.name}</span>!`, 'consumable'); 
+                            
+                            if (consumable.effect.type === 'combat') {
+                                playerPower *= consumable.effect.power;
+                            } else if (consumable.effect.effect === 'xp_boost') {
+                                const questXp = randomInt(40, 80) * player.level;
+                                gainXp(questXp); // Instant splash
+                                player.activeBuffs.push({ ...consumable.effect, bonusLevel: 5 }); // Start with bonus level 5 (50%)
+                            } else if (consumable.effect.effect === 'repair') {
+                                let mostDamagedItem = null;
+                                let lowestDurabilityPercent = 1;
+
+                                for (const slot in player.equipment) {
+                                    const item = player.equipment[slot];
+                                    if (item && item.hasOwnProperty('durability') && item.maxDurability > 0 && (item.durability < item.maxDurability || item.isBroken)) {
+                                        const durabilityPercent = item.isBroken ? 0 : item.durability / item.maxDurability;
+                                        if (durabilityPercent < lowestDurabilityPercent) {
+                                            lowestDurabilityPercent = durabilityPercent;
+                                            mostDamagedItem = item;
+                                        }
+                                    }
+                                }
+
+                                if (mostDamagedItem) {
+                                    const repairAmount = Math.floor(mostDamagedItem.maxDurability * 0.4);
+                                    mostDamagedItem.durability = Math.min(mostDamagedItem.maxDurability, mostDamagedItem.durability + repairAmount);
+                                    if(mostDamagedItem.durability > 0) mostDamagedItem.isBroken = false;
+                                    logMessage(`The Seabed Resin repaired your <span class="font-bold text-cyan-400">${mostDamagedItem.name}</span> by ${repairAmount} durability!`, 'repair');
+                                } else {
+                                    logMessage('All your gear is in perfect condition!', 'repair');
+                                }
+                            } else { // For all other buffs
+                                player.activeBuffs.push({ ...consumable.effect });
+                            }
+                        }
+                    }
+
+                    let castChance = (getStat('instinct') + tempInstinctBuff) / 100 + (player.class === 'Ink Ranger' ? 0.25 : 0);
+                    
+                    if (Object.keys(player.spellbook).length > 0 && Math.random() < castChance) {
+                        const spellKey = getRandom(Object.keys(player.spellbook)), spell = config.spells[spellKey], spellLevel = player.spellbook[spellKey];
+                        logMessage(`Casts <span class="font-bold text-pink-400">${spell.name} (Lvl ${spellLevel})</span>!`, 'learnSpell');
+                        if (spell.type === 'combat') { playerPower *= spell.power[spellLevel - 1]; if (spell.effect === 'confuse' && Math.random() < spell.successChance[spellLevel - 1]) { logMessage(`The enemy is confused by the <span class="font-bold text-pink-400">Bubble Swarm</span>, its power is halved!`, 'learnSpell'); enemyPower *= 0.5; } }
+                        else if (spell.type === 'buff') { if (!player.activeBuffs.some(b => b.spellKey === spellKey)) { let buffToAdd = { ...spell, spellKey, amount: spell.amount ? spell.amount[spellLevel - 1] : 0, duration: spell.duration ? spell.duration[spellLevel-1] : 0 }; player.activeBuffs.push(buffToAdd); } }
+                        else if (spell.type === 'debuff') { if (spell.effect === 'weaken') enemyPower *= spell.power[spellLevel - 1]; else if (spell.effect === 'armorBreak') enemyPower -= spell.amount[spellLevel - 1]; }
+                        else if (spell.type === 'utility') {
+                            switch(spell.effect) {
+                                case 'sleep':
+                                    if (Math.random() < spell.successChance[spellLevel-1]) {
+                                        logMessage(`The enemy is put to sleep!`, 'learnSpell');
+                                        autoWin = true;
+                                    }
+                                    break;
+                                default: // For all other utility spells that grant a buff
+                                    if (spell.duration && !player.activeBuffs.some(b => b.spellKey === spellKey)) {
+                                        player.activeBuffs.push({ ...spell, spellKey, amount: 0, duration: spell.duration[spellLevel - 1] });
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                    
+                    let critChance = getStat('biteForce') / 500 + (player.class === 'Predator' ? 0.2 : 0) + (player.class === 'Ambush Artist' ? 0.5 : 0) + (player.class === 'Fin Striker' ? (getStat('finSpeed')*0.0025):0);
+                    if (Math.random() < critChance) { player.class === 'Predator' ? playerPower *= 2 : playerPower *= 1.5; logMessage(`A <span class="font-bold text-yellow-400">Critical Hit!</span>`, 'fight'); }
+                    if (player.class === 'Trench Stalker' && enemyLevel > player.level) enemyPower *= 0.8;
+                    let playerDefense = getStat('scaleHardness') + tempScaleHardnessBuff;
+                    if (player.activeBuffs.some(b => b.effect && b.effect === 'luminescenceDefense')) playerDefense += getStat('luminescence');
+                    if (currentWorldEvent && currentWorldEvent.key === 'Seabed_Tremor' && currentWorldEvent.effects.lateralLineBonus) playerDefense += currentWorldEvent.effects.lateralLineBonus;
+                    
+                    const barbedHideBuff = player.activeBuffs.find(b => b.effect === 'thorns');
+                    if (barbedHideBuff) {
+                        const spellLevel = player.spellbook[barbedHideBuff.spellKey];
+                        const activationChance = 0.15 + (spellLevel - 1) * 0.05;
+                        
+                        if (Math.random() < activationChance) {
+                            const powerReductionPercent = randomInt(10, 25);
+                            const powerReductionFactor = (100 - powerReductionPercent) / 100;
+                            enemyPower *= powerReductionFactor;
+                            
+                            logMessage(`The enemy is impaled by your <span class="font-bold text-cyan-400">Barbed Hide</span>, its power is reduced by ${powerReductionPercent}%!`, 'learnSpell');
+                        }
+                    }
+
+                    if (player.class === 'Aegis Guard' && Math.random() < getStat('scaleHardness') / 500) {
+                        enemyPower *= 0.1;
+                        logMessage(`Your hardened scales absorb the attack!`, 'equipment');
+                        // --- REBALANCE: Aegis Guard Perk ---
+                        if (Math.random() < 0.25) {
+                            const breakableGear = Object.values(player.equipment).filter(item => 
+                                item && item.slot !== 'symbiont' && item.tier !== 'Basic' && item.tier !== 'Legendary' && !item.isBroken
+                            );
+                            if (breakableGear.length > 0) {
+                                const itemToBreak = getRandom(breakableGear);
+                                itemToBreak.durability = 0;
+                                itemToBreak.isBroken = true;
+                                logMessage(`The force of the blow was immense! Your <span class="text-red-500">${itemToBreak.name}</span> broke under the strain!`, 'equipment');
+                            }
+                        }
+                    }
+
+                    enemyPower = Math.max(1, enemyPower - playerDefense);
+                    
+                    if (autoWin || Math.random() < playerPower / (playerPower + enemyPower)) {
+                        gainXp(potentialXpGain);
+                        logMessage(`Defeated the ${currentTask.monster}.`, 'winFight');
+                        if (player.class === 'Frenzied Brawler') { player.activeBuffs.push({ name: 'Blood in the Water', stat: 'biteForce', amount: Math.ceil(getStat('biteForce') * 0.2), duration: 2 }); logMessage(`The thrill of victory sends you into a frenzy!`, 'fight'); }
+
+                        // --- REBALANCE: Lure Master Perk (Part 2: Reputation gain) ---
+                        if (lureMasterBonusActive && player.class === 'Lure Master' && Math.random() < 0.02) {
+                            const repGain = randomInt(1, 3);
+                            logMessage(`Your victory over a powerful foe spreads like ripples! Your reputation with all factions increases by ${repGain}!`, 'repUp');
+                            for (const faction in player.reputation) {
+                                player.reputation[faction] = Math.min(20, Math.max(-20, player.reputation[faction] + repGain));
+                            }
+                        }
+                        
+                        // Durability loss only on win now
+                        for (const slot in player.equipment) {
+                            const item = player.equipment[slot];
+                            if (slot === 'symbiont' || !item || item.tier === 'Basic' || item.tier === 'Legendary' || item.isBroken || !item.hasOwnProperty('durability')) continue;
+                            
+                            if (Math.random() < 0.5) { // 50% chance to lose durability
+                                item.durability--;
+
+                                if (item.durability <= 0) {
+                                    item.isBroken = true; // --- REBALANCE: New Breaking Logic ---
+                                    logMessage(`Your <span class="font-bold text-red-600">${item.name}</span> broke! Its bonuses are halved and magical effects are disabled.`, 'equipment');
+                                }
+                            }
+                        }
+
+                        if (currentTask.isJellyfishSwarmEnemy) {
+                            logMessage(`The jellyfish dissipates, leaving nothing behind.`);
+                        } else if (isBoss) {
+                            logMessage(`The legendary foe is vanquished!`, 'boss');
+                            const bossData = config.bosses[currentTask.bossKey];
+                            const legendaryItem = generateEquipment('Legendary', bossData.legendarySlot, { bossKey: currentTask.bossKey });
+                             if (legendaryItem) {
+                                let shouldEquipLegendary = true;
+                                if (legendaryItem.slot === 'symbiont') {
+                                    if (getSymbiontStatTotal(legendaryItem) <= getSymbiontStatTotal(player.equipment.symbiont)) {
+                                        shouldEquipLegendary = false;
+                                    }
+                                }
+                                
+                                if (shouldEquipLegendary) {
+                                    if (legendaryItem.slot === 'symbiont' && player.equipment.symbiont && player.equipment.symbiont.name === 'Sammy the Shrimp') {
+                                        logMessage(`'Looks like you found someone better!' Sammy the Shrimp says cheerfully. 'My work here is done. Farewell, friend!' He gives a tiny salute and swims away.`, 'shrimp');
+                                    }
+                                    player.equipment[legendaryItem.slot] = legendaryItem;
+                                    logMessage(`Claimed and equipped the <span class="font-bold ${config.equipment.tiers.Legendary.color}">${legendaryItem.name}</span>!`, 'equipment');
+                                } else {
+                                     logMessage(`You found the <span class="font-bold ${config.equipment.tiers.Legendary.color}">${legendaryItem.name}</span>, but your current symbiont is superior!`, 'equipment');
+                                }
+                            }
+                            player.defeatedBosses.push(currentTask.bossKey);
+                        } else if (isMiniBoss) {
+                            const consumableKey = getRandom(Object.keys(config.consumables));
+                            player.consumables[consumableKey] = (player.consumables[consumableKey] || 0) + 1;
+                            logMessage(`The shark dropped a <span class="font-bold text-purple-400">${config.consumables[consumableKey].name}</span>!`, 'consumable');
+                        } else {
+                            let numDrops = randomInt(1, 3) + Math.floor(getStat('lateralLine') / 25) + (player.class === 'Scavenger' ? randomInt(1,3) : 0);
+                            if (enemyLevel - player.level > 2) numDrops++; if (enemyLevel - player.level > 5) numDrops++;
+                            if (player.activeBuffs.some(b => b.effect && b.effect.includes('find'))) { numDrops += randomInt(1, 2); logMessage(`A magical aura reveals more treasures!`, 'learnSpell'); }
+                            if (currentWorldEvent && currentWorldEvent.effects.lootChanceModifier) numDrops = Math.ceil(numDrops * currentWorldEvent.effects.lootChanceModifier);
+                            logMessage(`The defeated foe drops a haul of items!`, 'loot');
+                            for (let i = 0; i < Math.min(numDrops, 7); i++) {
+                                // --- REBALANCE: Scavenger Perk ---
+                                if (player.class === 'Scavenger' && Math.random() < 0.15) {
+                                    const consumableKey = getRandom(Object.keys(config.consumables));
+                                    player.consumables[consumableKey] = (player.consumables[consumableKey] || 0) + 1;
+                                    logMessage(`Your scavenging skills uncovered a hidden <span class="font-bold text-purple-400">${config.consumables[consumableKey].name}</span>!`, 'consumable');
+                                    continue;
+                                }
+
+                                const lootTypeRoll = Math.random();
+                                if (lootTypeRoll < 0.05 || (currentWorldEvent && currentWorldEvent.key === 'Volcanic_Rift' && Math.random() < currentWorldEvent.effects.magicFindChance)) {
+                                    const newItem = generateEquipment();
+                                    
+                                    let shouldEquipItem = false;
+                                    if (newItem.slot === 'symbiont') {
+                                        if (getSymbiontStatTotal(newItem) > getSymbiontStatTotal(player.equipment.symbiont)) {
+                                            shouldEquipItem = true;
+                                        }
+                                    } else {
+                                        if (shouldEquip(newItem)) {
+                                            shouldEquipItem = true;
+                                        }
+                                    }
+
+                                    if (shouldEquipItem) {
+                                        if (newItem.slot === 'symbiont' && player.equipment.symbiont && player.equipment.symbiont.name === 'Sammy the Shrimp') {
+                                             logMessage(`'Looks like you found someone better!' Sammy the Shrimp says cheerfully. 'My work here is done. Farewell, friend!' He gives a tiny salute and swims away.`, 'shrimp');
+                                        }
+                                        player.equipment[newItem.slot] = newItem;
+                                        logMessage(`Found and equipped: <span class="font-bold text-cyan-400">${newItem.name}</span>!`, 'equipment');
+                                    }
+                                } else if (lootTypeRoll < 0.25) {
+                                    let shellsFound = randomInt(10, 30) * player.level;
+                                    if (player.class === 'Bottom Dweller') shellsFound *= 1.5;
+                                    if (player.activeBuffs.some(b => b.effect && b.effect === 'findShells')) shellsFound *= 1.5;
+                                    if (currentWorldEvent && currentWorldEvent.key === 'Seabed_Tremor' && currentWorldEvent.effects.shellsBonus) shellsFound *= currentWorldEvent.effects.shellsBonus;
+                                    player.shells += Math.floor(shellsFound); logMessage(`Found <span class="font-bold text-yellow-300">${Math.floor(shellsFound)} Shells</span>!`, 'shells');
+                                } else {
+                                    const loot = generateLoot();
+                                    player.inventory[loot.name] = (player.inventory[loot.name] || 0) + 1;
+                                    player.encumbrance += loot.weight; logMessage(`Found: <span class="font-bold text-cyan-400">${loot.name}</span>!`, 'loot');
+                                }
+                            }
+                            if (player.class === 'Kelp Stalker' && Math.random() < 0.35) {
+                                const extraKelp = randomInt(1, 3);
+                                player.inventory['Twisted Kelp'] = (player.inventory['Twisted Kelp'] || 0) + extraKelp;
+                                player.encumbrance += extraKelp;
+                                logMessage(`Your knowledge of the currents reveals <span class="font-bold text-green-400">${extraKelp} extra Twisted Kelp</span>!`, 'loot');
+                            }
+                        }
+                    } else {
+                        justLostFight = true; // Set flag on defeat
+                        const echolocationBuff = player.activeBuffs.find(b => b.effect && b.effect === 'dodge');
+                        const inkCloudBuff = player.activeBuffs.find(b => b.effect && b.effect === 'escape');
+                        let savedFromDefeat = false;
+
+                        if (echolocationBuff) {
+                            const spellLevel = player.spellbook['echolocation'] || 1;
+                            const dodgeChance = 0.10 + (spellLevel * 0.02);
+                            
+                            if (Math.random() < dodgeChance) {
+                                savedFromDefeat = true;
+                                justLostFight = false;
+                                const xpAmount = potentialXpGain / (isBoss ? 1 : isMiniBoss ? 2 : 3);
+                                logMessage(`You were about to be defeated, but your Echolocation helped you dodge the final blow and escape!`, 'learnSpell');
+                                gainXp(xpAmount);
+                            }
+                        } else if (inkCloudBuff) {
+                            if (Math.random() < 0.95) {
+                                savedFromDefeat = true;
+                                justLostFight = false;
+                                logMessage(`You vanish into an Ink Cloud, escaping defeat! No XP was lost.`, 'learnSpell');
+                            }
+                        }
+
+                        if (!savedFromDefeat) {
+                            loseXp(potentialXpGain / (isBoss ? 1 : isMiniBoss ? 2 : 3)); 
+                            logMessage(`Was defeated by the ${currentTask.monster}!`, 'loseFight');
+                        }
+                    }
+                    break;
+                }
+                case 'specialEncounter': {
+                    const { enemyName, enemyFaction } = currentTask;
+                    const isMiniBoss = true;
+                    let enemyLevel = (config.locations.effects[player.currentLocation]?.maxEnemyLevel || player.level) + randomInt(8, 15);
+                    let playerPower = getStat('biteForce') + getStat('finSpeed');
+                    let enemyPower = enemyLevel * 11;
+                    let playerDefense = getStat('scaleHardness');
+                    enemyPower = Math.max(1, enemyPower - playerDefense);
+
+                    if (Math.random() < playerPower / (playerPower + enemyPower)) {
+                        logMessage(`You fought and defeated ${enemyName}!`, currentTask.enemyEmoji);
+                        logMessage(`The enemy respects your courage. Reputation with ${factionDisplayNames[enemyFaction]} increases by 10!`, 'repUp');
+                        player.reputation[enemyFaction] = Math.min(20, Math.max(-20, player.reputation[enemyFaction] + 10));
+                        const shellsLost = Math.floor(player.shells * 0.10);
+                        player.shells -= shellsLost;
+                        logMessage(`Despite your victory, they still managed to take ${shellsLost} shells.`, 'shells');
+                    } else {
+                        logMessage(`You were defeated by ${enemyName}!`, 'loseFight');
+                        const shellsLost = Math.floor(player.shells * 0.50);
+                        player.shells -= shellsLost;
+                        logMessage(`You lose half your shells (${shellsLost}).`, 'shells');
+                    }
+                    break;
+                }
+                case 'quest': {
+                    const { faction, verb, target } = currentTask;
+                    let questXp = randomInt(40, 80) * player.level * (player.class === 'Filter Feeder' ? 1.05 : 1);
+                    let failChance = 0.10 - ((player.reputation[faction] || 0) / 40);
+                    if (faction === 'Other' || Math.random() >= failChance) {
+                        const repChange = verb.rep;
+                        gainXp(questXp);
+                        logMessage(`Completed quest: <span class="italic">${currentTask.description}</span>.`, 'quest');
+                        if (Math.random() < 0.40) { const shells = Math.floor(randomInt(40, 70) * player.level); player.shells += shells; logMessage(`Received a reward of <span class="font-bold text-yellow-300">${shells} Shells</span>!`, 'shells'); }
+                        if (faction !== 'Other') {
+                            player.reputation[faction] = Math.min(20, Math.max(-20, player.reputation[faction] + repChange)); 
+                            if (repChange !== 0) {
+                                logMessage(`Reputation with ${factionDisplayNames[faction]} ${repChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(repChange)}.`, repChange > 0 ? 'repUp' : 'repDown');
+                            }
+                        }
+                    } else {
+                        logMessage(`Quest Failed: <span class="italic">${currentTask.description}</span>.`, 'questFail');
+                        loseXp(questXp);
+                        if (faction !== 'Other') { player.reputation[faction] = Math.min(20, Math.max(-20, player.reputation[faction] - 2)); logMessage(`Reputation with ${factionDisplayNames[faction]} decreased by 2.`, 'repDown'); }
+                    }
+                    break;
+                }
+                case 'returnToMarket': {
+                    player.currentLocation = 'Narragansett Bay';
+                    logMessage(`Returned to the Spawning Grounds.`, 'returnToMarket');
+                    startSellLoot(); return;
+                }
+                case 'sellLoot': {
+                    let totalValue = 0;
+                    for (const itemName in player.inventory) totalValue += (config.loot[itemName]?.value || 0) * player.inventory[itemName];
+                    player.shells += totalValue;
+                    logMessage(`Sold all items for <span class="font-bold text-yellow-300">${totalValue} Shells</span>.`, 'sellLoot');
+                    player.inventory = {}; player.encumbrance = 0;
+                    startBuyGear(); return;
+                }
+                case 'buyGear': {
+                    let purchased = false;
+                    for (let i = 0; i < 10; i++) {
+                        const item = generateEquipment();
+                        const cost = (config.equipment.tiers[item.tier]?.value || 1) * 100 * player.level;
+                        
+                        let canAffordAndIsUpgrade = false;
+                        if (player.shells >= cost) {
+                            if (item.slot === 'symbiont') {
+                                if (getSymbiontStatTotal(item) > getSymbiontStatTotal(player.equipment.symbiont)) {
+                                    canAffordAndIsUpgrade = true;
+                                }
+                            } else {
+                                if (shouldEquip(item)) {
+                                    canAffordAndIsUpgrade = true;
+                                }
+                            }
+                        }
+
+                        if (canAffordAndIsUpgrade) {
+                            if (item.slot === 'symbiont' && player.equipment.symbiont && player.equipment.symbiont.name === 'Sammy the Shrimp') {
+                                logMessage(`'Looks like you found someone better!' Sammy the Shrimp says cheerfully. 'My work here is done. Farewell, friend!' He gives a tiny salute and swims away.`, 'shrimp');
+                            }
+                            player.shells -= cost;
+                            player.equipment[item.slot] = item;
+                            logMessage(`Bought a <span class="font-bold text-cyan-400">${item.name}</span> for ${cost} Shells.`, 'buyGear');
+                            purchased = true;
+                            break;
+                        }
+                    }
+                    if (!purchased) logMessage(`Couldn't afford any better gear.`, 'buyGear');
+                    startLearnSpell(); return;
+                }
+                case 'learnSpell': {
+                    const spellCost = randomInt(250, 400) * player.level;
+                    if (player.shells >= spellCost) {
+                        if (handleSpellLearnEvent(true)) {
+                            player.shells -= spellCost;
+                        } else {
+                            logMessage(`No new spells could be learned.`, 'learnSpell');
+                        }
+                    } else {
+                        logMessage(`Couldn't afford to learn any new spells.`, 'learnSpell');
+                    }
+                    forceTravelTask();
+                    return;
+                }
+                case 'merchantEncounter': {
+                    logMessage(`A wandering merchant, ${currentTask.merchant.species}, has appeared!`, 'merchant');
+                    startMerchantTrade(currentTask.merchant); return;
+                }
+                case 'merchantTrade': {
+                    const { type, name } = currentTask.merchant;
+                    logMessage(`Trading with ${name}...`);
+                    if (type === 'gear') {
+                        const itemsForSale = Array.from({length: 3}, () => generateEquipment());
+                        const affordableUpgrade = itemsForSale.map(item => ({ item, cost: Math.floor((config.equipment.tiers[item.tier]?.value || 1) * 75 * player.level) }))
+                            .filter(({item, cost}) => {
+                                if (player.shells < cost) return false;
+                                if (item.slot === 'symbiont') {
+                                    return getSymbiontStatTotal(item) > getSymbiontStatTotal(player.equipment.symbiont);
+                                }
+                                return shouldEquip(item);
+                            })
+                            .sort((a, b) => { // Sort by score to get the best upgrade
+                                const scoreA = a.item.slot === 'symbiont' ? getSymbiontStatTotal(a.item) : calculateItemScore(a.item);
+                                const scoreB = b.item.slot === 'symbiont' ? getSymbiontStatTotal(b.item) : calculateItemScore(b.item);
+                                return scoreB - scoreA;
+                            })[0];
+
+                        if (affordableUpgrade) {
+                             if (affordableUpgrade.item.slot === 'symbiont' && player.equipment.symbiont && player.equipment.symbiont.name === 'Sammy the Shrimp') {
+                                logMessage(`'Looks like you found someone better!' Sammy the Shrimp says cheerfully. 'My work here is done. Farewell, friend!' He gives a tiny salute and swims away.`, 'shrimp');
+                            }
+                            player.shells -= affordableUpgrade.cost;
+                            player.equipment[affordableUpgrade.item.slot] = affordableUpgrade.item;
+                            logMessage(`Bought <span class="font-bold text-cyan-400">${affordableUpgrade.item.name}</span> for ${affordableUpgrade.cost} shells.`, 'buyGear');
+                        } else logMessage(`${name} had nothing of interest.`, 'merchant');
+                    } else if (type === 'spells') handleCoraliaLesson();
+                    else if (type === 'consumables') {
+                        let bought = 0;
+                        for (let i = 0; i < randomInt(1, 5); i++) {
+                            const key = getRandom(Object.keys(config.consumables));
+                            const cost = Math.floor(randomInt(20, 80) * player.level * (1 + (Object.keys(config.consumables[key].recipe).length * 0.15)));
+                            if (player.shells >= cost) { player.shells -= cost; player.consumables[key] = (player.consumables[key] || 0) + 1; logMessage(`Bought a <span class="font-bold text-purple-400">${config.consumables[key].name}</span> for ${cost} shells.`, 'consumable'); bought++; }
+                            else break;
+                        }
+                        if (bought === 0) logMessage(`You couldn't afford any of Barnaby's supplies.`, 'merchant');
+                    }
+                    break;
+                }
+                case 'erikaEncounter': {
+                    logMessage(`'Hi there!' chirps Erika. 'I see you have some lovely Mermaid's Purses. I'll buy them all!'`, 'dolphin');
+                    
+                    const purseCount = player.inventory["Mermaid's Purse"] || 0;
+
+                    if (purseCount > 0) {
+                        const marketValue = config.loot["Mermaid's Purse"].value;
+                        const pricePerPurse = marketValue * 3;
+                        const totalValue = pricePerPurse * purseCount;
+
+                        player.shells += totalValue;
+                        player.inventory["Mermaid's Purse"] = 0;
+                        player.encumbrance -= purseCount;
+                        if (player.inventory["Mermaid's Purse"] === 0) {
+                            delete player.inventory["Mermaid's Purse"];
+                        }
+
+                        logMessage(`Erika bought ${purseCount} Mermaid's Purse(s) for a total of <span class="font-bold text-yellow-300">${totalValue} Shells</span>!`, 'sellLoot');
+                        logMessage(`'Thank you so much! Here's a little something for your trouble.' Erika glows with a gentle light.`, 'dolphin');
+                        
+                        const lumIncrease = Math.ceil(getStat('luminescence') * 0.20);
+                        const latIncrease = Math.ceil(getStat('lateralLine') * 0.20);
+                        player.activeBuffs = player.activeBuffs.filter(b => b.name !== "Erika's Blessing");
+                        player.activeBuffs.push({ name: "Erika's Blessing", stat: 'luminescence', amount: lumIncrease, duration: 9 });
+                        player.activeBuffs.push({ name: "Erika's Blessing", stat: 'lateralLine', amount: latIncrease, duration: 9 });
+                        logMessage(`You received <span class="font-bold text-cyan-300">Erika's Blessing</span>!`, 'dolphin');
+
+                    } else {
+                        logMessage(`'Oh, it seems you don't have any purses for me today. Well, it was nice seeing you anyway!' Erika says with a friendly flip of her tail.`, 'dolphin');
+                    }
+                    
+                    break;
+                }
+                case 'turtleEncounter': {
+                    let totalRepairCost = 0;
+                    let itemsToRepair = 0;
+                    for (const slot in player.equipment) {
+                        const item = player.equipment[slot];
+                        if (item && item.name !== 'None' && item.hasOwnProperty('durability') && (item.durability < item.maxDurability || item.isBroken)) {
+                            const missingDurability = item.maxDurability - item.durability;
+                            const tierValue = config.equipment.tiers[item.tier]?.value || 1;
+                            totalRepairCost += missingDurability * tierValue * 2;
+                            if (item.originalTier) {
+                                const originalTierValue = config.equipment.tiers[item.originalTier]?.value || 1;
+                                totalRepairCost += originalTierValue * 20;
+                            }
+                            itemsToRepair++;
+                        }
+                    }
+
+                    if (itemsToRepair > 0) {
+                        if (player.shells >= totalRepairCost) {
+                            player.shells -= totalRepairCost;
+                            for (const slot in player.equipment) {
+                                const item = player.equipment[slot];
+                                if (item && item.hasOwnProperty('durability') && (item.durability < item.maxDurability || item.isBroken)) {
+                                    if (item.isBroken) {
+                                        item.name = item.name.replace(`${getRandom(config.equipment.brokenAdjectives)} `, '');
+                                        item.isBroken = false;
+                                    }
+                                    if (item.originalTier) {
+                                        item.tier = item.originalTier;
+                                        delete item.originalTier;
+
+                                        const restoredTier = config.equipment.tiers[item.tier];
+                                        const variance = randomInt(-2, 2);
+                                        item.bonus = Math.max(1, restoredTier.bonus + variance) + Math.floor(player.level / 10);
+                                        
+                                        let newMaxDurability = restoredTier.value * 10;
+                                        if (item.magicalBonus) {
+                                            newMaxDurability = Math.floor(newMaxDurability * 1.35);
+                                        }
+                                        item.maxDurability = newMaxDurability;
+                                    }
+                                    item.durability = item.maxDurability;
+                                }
+                            }
+                            logMessage(`Shelly repairs all your gear for ${totalRepairCost} shells.`, 'turtle');
+                        } else {
+                            logMessage(`You can't afford Shelly's repair fee of ${totalRepairCost} shells.`, 'turtle');
+                        }
+                    } else {
+                        logMessage(`Shelly sees your gear is in perfect condition and swims off.`, 'turtle');
+                    }
+                    break;
+                }
+                case 'seal': {
+                    const consumableKeys = Object.keys(player.consumables).filter(k => player.consumables[k] > 0);
+                    const inventoryKeys = Object.keys(player.inventory).filter(k => player.inventory[k] > 0);
+
+                    if (consumableKeys.length > 0) {
+                        const consumableToTake = getRandom(consumableKeys);
+                        player.consumables[consumableToTake]--;
+                        logMessage(`Seamus finds a tasty treat! He takes your <span class="font-bold text-purple-400">${config.consumables[consumableToTake].name}</span>.`, 'seal');
+                        
+                        for (const faction in player.reputation) {
+                            player.reputation[faction] = Math.min(20, Math.max(-20, player.reputation[faction] + 10));
+                        }
+                        logMessage(`Delighted, he blesses you! All reputations increase by 10!`, 'repUp');
+
+                    } else if (inventoryKeys.length > 0) {
+                        let itemsToTakeCount = randomInt(1, 8);
+                        let itemsTaken = 0;
+                        
+                        logMessage(`Seamus rummages through your belongings...`, 'seal');
+
+                        for (let i = 0; i < itemsToTakeCount; i++) {
+                            const currentInvKeys = Object.keys(player.inventory).filter(k => player.inventory[k] > 0);
+                            if (currentInvKeys.length === 0) break;
+                            const itemToTake = getRandom(currentInvKeys);
+                            player.inventory[itemToTake]--;
+                            player.encumbrance--;
+                            if (player.inventory[itemToTake] <= 0) delete player.inventory[itemToTake];
+                            itemsTaken++;
+                            logMessage(`He takes a <span class="font-bold text-cyan-400">${itemToTake}</span>.`, 'loot');
+                        }
+
+                        if (itemsTaken < itemsToTakeCount && itemsTaken > 0) {
+                            logMessage(`Your bags are empty! Seamus shrugs and resets all your reputations to Neutral.`, 'seal');
+                            for (const faction in player.reputation) player.reputation[faction] = 0;
+                        } else {
+                            logMessage(`After taking ${itemsTaken} item(s), Seamus cleanses your ill will.`, 'seal');
+                            for (const faction in player.reputation) if (player.reputation[faction] < 0) player.reputation[faction] = 0;
+                            logMessage('All negative reputations have been cleared.', 'repUp');
+                        }
+
+                    } else {
+                        logMessage('Seamus finds your bags completely empty and becomes furious!', 'seal');
+                        if (player.shells > 0) {
+                            logMessage(`He takes all ${player.shells} of your shells!`, 'shells');
+                            player.shells = 0;
+                        }
+                        logMessage('As a final insult, he inverts all of your reputations!', 'repDown');
+                        for (const faction in player.reputation) player.reputation[faction] *= -1;
+                    }
+                    break;
+                }
+                case 'crabEncounter': {
+                    logMessage(`'Care for a game of chance, friend? High stakes, high rewards!' she clacks.`, 'crab');
+                    startCrapsGame();
+                    return;
+                }
+                case 'crapsGame': {
+                    const bet = currentTask.bet;
+                    player.shells -= bet;
+
+                    const rollDice = () => randomInt(1, 6) + randomInt(1, 6);
+                    let comeOutRoll = rollDice();
+                    logMessage(`The come-out roll... The dice clatter to a ${comeOutRoll}.`, 'crab');
+                    
+                    if (comeOutRoll === 7 || comeOutRoll === 11) {
+                        const winnings = bet * 2;
+                        player.shells += winnings;
+                        logMessage(`Natural! You win ${winnings} shells!`, 'winFight');
+                    } else if (comeOutRoll === 2 || comeOutRoll === 3 || comeOutRoll === 12) {
+                        logMessage(`Craps! You lose your bet of ${bet} shells.`, 'loseFight');
+                    } else {
+                        const point = comeOutRoll;
+                        logMessage(`The point is set to ${point}. Now roll a ${point} to win, but a 7 will lose.`, 'crab');
+                        
+                        let pointRoll;
+                        do {
+                            pointRoll = rollDice();
+                            logMessage(`Rolling for the point... it's a ${pointRoll}.`, 'crab');
+                        } while (pointRoll !== point && pointRoll !== 7);
+
+                        if (pointRoll === point) {
+                            const winnings = bet * 2;
+                            player.shells += winnings;
+                            logMessage(`You hit the point! You win ${winnings} shells!`, 'winFight');
+                        } else { // pointRoll is 7
+                            logMessage(`Seven out! You lose your bet of ${bet} shells.`, 'loseFight');
+                        }
+                    }
+                    logMessage(`Kingsley the High-Roller gives a final click of her claws and scuttles away.`, 'crab');
+                    break;
+                }
+                case 'oscarEncounter': {
+                    const pebbleCount = player.inventory['Polished Pebble'] || 0;
+                    if (pebbleCount > 0) {
+                        player.inventory['Polished Pebble'] = 0;
+                        player.encumbrance -= pebbleCount;
+                        if (player.inventory['Polished Pebble'] === 0) delete player.inventory['Polished Pebble'];
+                        const buffDuration = pebbleCount * 3;
+                        player.activeBuffs.push({ name: "Oscar's Luck", duration: buffDuration + 1 });
+                        logMessage(`Oscar the Otter swipes all ${pebbleCount} of your polished pebbles! In return, he seems to have blessed you with good fortune.`, 'otter');
+                    }
+                    break;
+                }
+                case 'swanEncounter': {
+                    const buffAmount = 5 + player.level;
+                    player.activeBuffs = player.activeBuffs.filter(b => b.name !== "Sovereign's Grace");
+                    player.activeBuffs.push({ name: "Sovereign's Grace", stat: 'scaleHardness', amount: buffAmount, duration: 5 });
+                    player.activeBuffs.push({ name: "Sovereign's Grace", stat: 'instinct', amount: buffAmount, duration: 5 });
+                    logMessage(`The Swan Sovereign grants you its blessing! Your scales harden and your mind sharpens.`, 'swan');
+                    break;
+                }
+                case 'duckEncounter': {
+                    const consumableKeys = Object.keys(player.consumables).filter(k => player.consumables[k] > 0);
+                    if (consumableKeys.length > 0) {
+                        const keyToTake = getRandom(consumableKeys);
+                        player.consumables[keyToTake]--;
+                        logMessage(`Derek the Duck aggressively snatches your ${config.consumables[keyToTake].name}!`, 'duck');
+                    } else {
+                        logMessage(`Finding no treats, Derek the Duck bites your tail! Your fin speed is reduced.`, 'duck');
+                        player.activeBuffs.push({ name: "Quacked Off", stat: 'finSpeed', amount: -10, duration: 4 });
+                    }
+                    break;
+                }
+                case 'inkyEncounter': {
+                    const eligibleSlots = Object.keys(player.equipment).filter(slot => {
+                        const item = player.equipment[slot];
+                        return item && item.name !== 'None' && item.tier !== 'Legendary' && item.tier !== 'Basic';
+                    });
+
+                    if (eligibleSlots.length > 0) {
+                        const slotToReroll = getRandom(eligibleSlots);
+                        const item = player.equipment[slotToReroll];
+                        const oldName = item.name;
+                        
+                        let secondaryStat = getRandom(Object.keys(player.stats));
+                        if (slotToReroll !== 'symbiont') {
+                            while(secondaryStat === item.primaryStat) {
+                                secondaryStat = getRandom(Object.keys(player.stats));
+                            }
+                        }
+                        item.magicalBonus = { stat: secondaryStat, amount: Math.ceil(item.bonus / 2) };
+
+                        if (!config.equipment.magicalAdjectives.some(adj => oldName.includes(adj))) {
+                            item.name = `${getRandom(config.equipment.magicalAdjectives)} ${oldName}`;
+                        }
+                        
+                        logMessage(`Inky the Abyssal Artist sprays a cloud of ink over your ${oldName}, altering its properties! It is now the ${item.name}.`, 'squid');
+                    } else {
+                        logMessage(`Inky the Abyssal Artist inspects your gear but finds nothing worthy of its artistic touch.`, 'squid');
+                    }
+                    break;
+                }
+                case 'sammyEncounter': {
+                    const sammySymbiont = {
+                        name: 'Sammy the Shrimp',
+                        primaryStat: 'all',
+                        bonus: 5 + Math.floor(player.level / 2),
+                        tier: 'Skeletal',
+                        magicalBonus: null
+                    };
+
+                    const sammyValue = getSymbiontStatTotal(sammySymbiont);
+                    const currentValue = getSymbiontStatTotal(player.equipment.symbiont);
+
+                    if (sammyValue > currentValue) {
+                        logMessage(`Sammy the Shrimp offers to join you. He's now your loyal symbiont!`, 'shrimp');
+                        if (player.equipment.symbiont && player.equipment.symbiont.name !== 'None') {
+                             logMessage(`You say goodbye to your previous symbiont, ${player.equipment.symbiont.name}, to make room for Sammy.`, 'shrimp');
+                        }
+                        player.equipment.symbiont = sammySymbiont;
+                    } else {
+                        logMessage(`'Whoa, that's a tough-looking friend you've got there!' Sammy the Shrimp says. 'I'll let you be. Maybe next time!' He scuttles away.`, 'shrimp');
+                    }
+                    break;
+                }
+                case 'puffyEncounter': {
+                    logMessage(`Puffy the Blowfish is disgusted by your failure! He puffs up angrily.`, 'blowfish');
+                    player.activeBuffs.push({ name: "Puffy's Scorn", duration: 2 });
+                    player.activeBuffs.push({ name: "Puffed Up Pride", stat: 'scaleHardness', amount: 15, duration: 4 });
+                    logMessage(`You feel shame, reducing future XP gain. But your scales feel tougher... from fear?`, 'blowfish');
+                    break;
+                }
+            }
+            checkForCrafting();
+            handleWorldEvents();
+            startNewTask();
+        }
+
+        function startSellLoot() { currentTask = { description: `Selling loot at the market...`, duration: 3000, progress: 0, type: 'sellLoot' }; }
+        function startBuyGear() { currentTask = { description: `Shopping for new equipment...`, duration: 4000, progress: 0, type: 'buyGear' }; }
+        function startLearnSpell() { currentTask = { description: `Seeking a spell tutor...`, duration: 3500, progress: 0, type: 'learnSpell' }; }
+
+        function startCrapsGame() {
+            const maxBetPercent = Math.max(10, 99 - Math.floor(getStat('instinct') / 2));
+            const betPercent = randomInt(1, maxBetPercent);
+            const bet = Math.floor(player.shells * (betPercent / 100));
+
+            if (bet < 10 || player.shells < 10) {
+                logMessage(`'Bah! Come back when you have some real clams to wager!' Kingsley scoffs.`, 'crab');
+                startNewTask();
+                return;
+            }
+            logMessage(`You agree to a game of craps, betting ${bet} shells (${betPercent}% of your total).`, 'crab');
+            currentTask = { 
+                description: `Playing craps with Kingsley. Bet: ${bet} shells.`, 
+                duration: 6000, 
+                progress: 0, 
+                type: 'crapsGame', 
+                bet: bet 
+            };
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the Earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function calculateMaxTravelDistance() {
+            let maxDist = 0;
+            const locations = Object.keys(config.locations.coordinates);
+            for (let i = 0; i < locations.length; i++) {
+                for (let j = i + 1; j < locations.length; j++) {
+                    const loc1 = config.locations.coordinates[locations[i]];
+                    const loc2 = config.locations.coordinates[locations[j]];
+                    const dist = calculateDistance(loc1.lat, loc1.lon, loc2.lat, loc2.lon);
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                    }
+                }
+            }
+            maxTravelDistance = maxDist;
+        }
+
+        function forceTravelTask() {
+            logMessage('Stocked up and ready for adventure! Setting out...', 'travel');
+            const travelableLocations = Object.keys(config.locations.effects).filter(loc => loc !== 'Narragansett Bay' && loc !== player.currentLocation);
+            const destination = getRandom(travelableLocations);
+            
+            const startCoords = config.locations.coordinates[player.currentLocation]; // Will be Narragansett Bay
+            const endCoords = config.locations.coordinates[destination];
+            const distance = calculateDistance(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+            
+            const minTime = 5000;
+            const maxTime = 30000;
+            let duration = minTime + (maxTime - minTime) * (distance / maxTravelDistance);
+
+            if (player.class === 'Current Rider' && Math.random() < 0.1) { duration = 100; logMessage(`You find a perfect slipstream and arrive in a flash!`, 'travel'); }
+            else {
+                if (player.activeBuffs.some(b => b.effect && b.effect === 'travelSpeed')) { duration *= 0.5; logMessage(`Wave Tuning speeds the journey!`, 'learnSpell'); }
+                if (player.activeBuffs.some(b => b.effect && b.effect === 'freshwaterSpeed') && config.locations.effects[destination]?.salinity === 0) { duration *= 0.5; logMessage(`Amphibious Grace quickens your pace!`, 'learnSpell'); }
+                if (currentWorldEvent?.key === 'Strong_Gale') { duration *= currentWorldEvent.effects.travelDurationModifier; logMessage(`The Strong Gale propels you with incredible speed!`, 'strongGale'); }
+                if (currentWorldEvent?.key === 'Jellyfish_Swarm' && player.class !== 'Current Rider') { // --- REBALANCE: Current Rider ---
+                     duration *= currentWorldEvent.effects.travelDurationModifier;
+                     logMessage(`The Jellyfish Swarm makes the journey arduous.`, 'worldEvent');
+                } else if (currentWorldEvent?.key === 'Jellyfish_Swarm' && player.class === 'Current Rider') {
+                    logMessage(`You skillfully navigate the Jellyfish Swarm, unaffected by its slowing effect!`, 'jellyfish');
+                }
+            }
+             currentTask = { description: `Traveling to ${destination}`, duration, progress: 0, type: 'travel', location: destination };
+             currentTask.duration = Math.floor(currentTask.duration * (1 - (getStat('finSpeed') * 0.002)));
+             
+             const locationData = config.locations.effects[player.currentLocation];
+             if (locationData && locationData.salinity === 0 && player.activeBuffs.some(b => b.spellKey === 'amphibiousGrace')) {
+                 currentTask.duration = Math.floor(currentTask.duration * 0.9);
+             }
+
+             logMessage(currentTask.description, currentTask.type);
+        }
+
+        function startNewTask() {
+            if (player.encumbrance >= Math.floor(20 + getStat('scaleHardness') * 0.5)) {
+                const startCoords = config.locations.coordinates[player.currentLocation];
+                const endCoords = config.locations.coordinates['Narragansett Bay'];
+                const distance = calculateDistance(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+                
+                const minTime = 5000;
+                const maxTime = 30000;
+                let duration = minTime + (maxTime - minTime) * (distance / maxTravelDistance);
+
+                currentTask = { description: `Encumbered! Returning to the Spawning Grounds...`, duration: duration, progress: 0, type: 'returnToMarket' };
+                logMessage(currentTask.description, 'returnToMarket');
+                return;
+            }
+
+            const isBloodVialActive = player.activeBuffs.some(b => b.name === 'Blood Vial');
+            let bossEncounterChance = 0.065;
+            let miniBossEncounterChance = 0.095;
+
+            if (isBloodVialActive) {
+                bossEncounterChance += 0.025;
+                miniBossEncounterChance += 0.05;
+            }
+            
+            if (currentWorldEvent && currentWorldEvent.key === 'Shark_Migration') {
+                miniBossEncounterChance += 0.20; // Makes shark encounters much more frequent
+            }
+
+            const locationEffects = config.locations.effects[player.currentLocation] || {};
+            const specialRoll = Math.random();
+            const riverLocations = ['Providence River', 'Pawcatuck River', 'Saugatucket River', 'Narrow River'];
+            const freshwaterPondLocations = ['Worden Pond', 'Carbuncle Pond', 'Wyoming Pond', 'Scituate Reservoir'];
+            const parkLocations = ['Haines Memorial Park', 'Lincoln Woods', 'Colt State Park', 'Goddard Park'];
+            const deepLocations = ['Coxes Ledge', 'Brenton Reef'];
+            const sammyLocations = ['Misquamicut', 'Point Judith Harbor', 'Charlestown Breachway'];
+            const erikaLocations = ['Beavertail State Park', 'Sachuest Point', 'Mackerel Cove', 'Potter\'s Cove'];
+
+            if (justLostFight && player.currentLocation === 'Watch Hill Reef' && specialRoll < 0.25 && !player.activeBuffs.some(b => b.name === "Puffy's Scorn")) {
+                justLostFight = false;
+                currentTask = { description: 'A grumpy blowfish notices your failure...', duration: 4000, progress: 0, type: 'puffyEncounter' };
+                logMessage(currentTask.description, 'blowfish');
+                return;
+            }
+            justLostFight = false; // Reset after check
+
+            if (riverLocations.includes(player.currentLocation) && (player.inventory['Polished Pebble'] || 0) > 1 && specialRoll < 0.10 && !player.activeBuffs.some(b => b.name === "Oscar's Luck")) {
+                currentTask = { description: 'An otter with a glint in its eye approaches...', duration: 5000, progress: 0, type: 'oscarEncounter' };
+                logMessage(currentTask.description, 'otter');
+                return;
+            }
+            if (freshwaterPondLocations.includes(player.currentLocation) && player.reputation['Bird'] >= 0 && specialRoll < 0.08 && !player.activeBuffs.some(b => b.name === "Sovereign's Grace")) {
+                currentTask = { description: 'A majestic swan glides towards you...', duration: 6000, progress: 0, type: 'swanEncounter' };
+                logMessage(currentTask.description, 'swan');
+                return;
+            }
+            if (parkLocations.includes(player.currentLocation) && specialRoll < 0.015 && !player.activeBuffs.some(b => b.name === "Quacked Off")) {
+                currentTask = { description: 'You hear an aggressive quacking nearby...', duration: 3000, progress: 0, type: 'duckEncounter' };
+                logMessage(currentTask.description, 'duck');
+                return;
+            }
+            if (deepLocations.includes(player.currentLocation) && player.spellbook['inkCloud'] && specialRoll < 0.07) {
+                currentTask = { description: 'A shadowy figure swirls in the darkness...', duration: 7000, progress: 0, type: 'inkyEncounter' };
+                logMessage(currentTask.description, 'squid');
+                return;
+            }
+            if (sammyLocations.includes(player.currentLocation) && (!player.equipment.symbiont || player.equipment.symbiont.name !== 'Sammy the Shrimp') && specialRoll < 0.05) {
+                currentTask = { description: 'A tiny, friendly-looking shrimp clicks its claws at you.', duration: 4000, progress: 0, type: 'sammyEncounter' };
+                logMessage(currentTask.description, 'shrimp');
+                return;
+            }
+            if (erikaLocations.includes(player.currentLocation) && player.inventory["Mermaid's Purse"] && specialRoll < 0.04 && !player.activeBuffs.some(b => b.name === "Erika's Blessing")) {
+                currentTask = { description: 'A cheerful dolphin with sparkling eyes approaches you!', duration: 5000, progress: 0, type: 'erikaEncounter' };
+                logMessage(currentTask.description, 'dolphin');
+                return;
+            }
+
+            if (currentWorldEvent?.key === 'Jellyfish_Swarm' && Math.random() < 0.3) {
+                currentTask = {
+                    description: `A jellyfish drifts towards you menacingly...`,
+                    duration: randomInt(4000, 8000),
+                    progress: 0,
+                    type: 'fight',
+                    monster: 'Swarm Jellyfish',
+                    isJellyfishSwarmEnemy: true
+                };
+                currentTask.duration = Math.floor(currentTask.duration * (1 - (getStat('finSpeed') * 0.002)));
+                logMessage(currentTask.description, 'jellyfish');
+                return;
+            }
+
+            let damagedItem = Object.values(player.equipment).some(item => item && item.hasOwnProperty('durability') && (item.durability < item.maxDurability || item.isBroken));
+
+            if (player.currentLocation === 'East Matunuck' && specialRoll < 0.07) {
+                currentTask = { description: 'A crab with suspiciously shiny claws clicks towards you...', duration: 4000, progress: 0, type: 'crabEncounter' };
+                logMessage(currentTask.description, 'crab');
+                return;
+            }
+            if (player.currentLocation === 'Stillhouse Cove' && !seamusEncounteredThisVisit && specialRoll < 0.15) {
+              seamusEncounteredThisVisit = true;
+              currentTask = { description: 'Seamus looks you over...', duration: 8000, progress: 0, type: 'seal' };  
+              logMessage('Seamus the Spectral Seal appears from the mist!', 'seal');
+              return;
+            }
+            if (locationEffects.salinity === 0 && damagedItem && specialRoll < 0.03) {
+                currentTask = { description: `Shelly the Snapping Turtle Blacksmith appears!`, duration: 5000, progress: 0, type: 'turtleEncounter' };
+                logMessage(currentTask.description, 'turtle');
+                return;
+            }
+            if (locationEffects.salinity === 2 && specialRoll < 0.06) {
+                const merchantKey = getRandom(Object.keys(config.merchants));
+                currentTask = { description: `A great shape looms in the distance...`, duration: 5000, progress: 0, type: 'merchantEncounter', merchant: { name: merchantKey, ...config.merchants[merchantKey] } };
+                logMessage(currentTask.description, 'merchant');
+                return;
+            }
+            
+            const despisedFactions = Object.keys(player.reputation).filter(f => getReputationTier(player.reputation[f]).name === 'Despised');
+            if (despisedFactions.length > 0 && Math.random() < 0.05) {
+                const targetFaction = getRandom(despisedFactions);
+                const enemyKey = Object.keys(config.specialEncounters).find(k => config.specialEncounters[k].faction === targetFaction);
+                if (enemyKey) {
+                    const enemyData = config.specialEncounters[enemyKey];
+                    currentTask = { 
+                        description: `A furious ${enemyData.name} has tracked you down for revenge!`,
+                        duration: randomInt(8000, 15000), 
+                        progress: 0, 
+                        type: 'specialEncounter', 
+                        enemyName: enemyData.name,
+                        enemyFaction: enemyData.faction,
+                        enemyEmoji: enemyData.emoji
+                    };
+                    logMessage(currentTask.description, 'specialEncounter');
+                    return;
+                }
+            }
+
+            const bossKey = Object.keys(config.bosses).find(k => config.bosses[k].location === player.currentLocation);
+            if (bossKey && player.level >= 15 && !player.defeatedBosses.includes(bossKey) && specialRoll < bossEncounterChance) {
+                const bossData = config.bosses[bossKey];
+                currentTask = { description: `An ancient terror emerges! Fighting ${bossData.name}!`, duration: randomInt(15000, 25000), progress: 0, type: 'fight', monster: bossData.name, isBoss: true, bossKey: bossKey };
+                logMessage(currentTask.description, 'boss');
+                return;
+            }
+            if (locationEffects.salinity !== 0 && player.level >= 10 && specialRoll < miniBossEncounterChance) {
+                const miniBossName = getRandom(config.miniBosses.names);
+                currentTask = { description: `Fighting a ${miniBossName}!`, duration: randomInt(8000, 15000), progress: 0, type: 'fight', monster: miniBossName, isMiniBoss: true };
+                logMessage(`A dangerous predator attacks! Fighting a ${miniBossName}!`, 'miniBoss');
+                return;
+            }
+            
+            const taskRoll = Math.random(), travelBonus = currentWorldEvent?.key === 'Strong_Gale' ? 0.10 : 0;
+            let fightChance = 0.6 - (travelBonus/2), questChance = 0.35 - (travelBonus/2);
+
+            if (taskRoll < fightChance) {
+                const monster = `${getRandom(config.monsters.prefixes)} ${getRandom(config.races)}`;
+                if (player.activeBuffs.some(b => b.effect && b.effect === 'dodge') && Math.max(1, randomInt(player.level + (locationEffects.minEnemyLevel || 0), player.level + (locationEffects.maxEnemyLevel || 0))) > player.level + 5) {
+                    logMessage(`Your Echolocation detects a powerful foe, and you safely avoid it.`, 'learnSpell');
+                    startNewTask(); return;
+                }
+                currentTask = { description: `Fighting a ${monster}`, duration: randomInt(2000, 10000), progress: 0, type: 'fight', monster: monster };
+            } else if (taskRoll < fightChance + questChance) {
+                const questVerb = getRandom(config.quest.verbs);
+                const questTarget = getRandom(config.quest.targets);
+                let duration = randomInt(8000, 19000);
+                currentTask = { 
+                    description: `${questVerb.text} ${questTarget.name}`, 
+                    duration: Math.floor(duration * (1 - (getStat('luminescence') * 0.005))), 
+                    progress: 0, 
+                    type: 'quest', 
+                    verb: questVerb, 
+                    target: questTarget,
+                    faction: questTarget.faction
+                };
+            } else {
+                const travelableLocations = Object.keys(config.locations.effects).filter(loc => loc !== 'Narragansett Bay' && loc !== player.currentLocation);
+                const destination = getRandom(travelableLocations);
+                const startCoords = config.locations.coordinates[player.currentLocation];
+                const endCoords = config.locations.coordinates[destination];
+                const distance = calculateDistance(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+                
+                const minTime = 5000;
+                const maxTime = 30000;
+                let duration = minTime + (maxTime - minTime) * (distance / maxTravelDistance);
+
+                if (player.class === 'Current Rider' && Math.random() < 0.1) { duration = 100; logMessage(`You find a perfect slipstream and arrive in a flash!`, 'travel'); }
+                else {
+                    if (player.activeBuffs.some(b => b.effect && b.effect === 'travelSpeed')) { duration *= 0.5; logMessage(`Wave Tuning speeds the journey!`, 'learnSpell'); }
+                    if (player.activeBuffs.some(b => b.effect && b.effect === 'freshwaterSpeed') && config.locations.effects[destination]?.salinity === 0) { duration *= 0.5; logMessage(`Amphibious Grace quickens your pace!`, 'learnSpell'); }
+                    if (currentWorldEvent?.key === 'Strong_Gale') { duration *= currentWorldEvent.effects.travelDurationModifier; logMessage(`The Strong Gale propels you with incredible speed!`, 'strongGale'); }
+                    if (currentWorldEvent?.key === 'Jellyfish_Swarm' && player.class !== 'Current Rider') { // --- REBALANCE: Current Rider ---
+                        duration *= currentWorldEvent.effects.travelDurationModifier;
+                        logMessage(`The Jellyfish Swarm makes the journey arduous.`, 'worldEvent');
+                    } else if (currentWorldEvent?.key === 'Jellyfish_Swarm' && player.class === 'Current Rider') {
+                        logMessage(`You skillfully navigate the Jellyfish Swarm, unaffected by its slowing effect!`, 'jellyfish');
+                    }
+                }
+                currentTask = { description: `Traveling to ${destination}`, duration, progress: 0, type: 'travel', location: destination };
+            }
+            currentTask.duration = Math.floor(currentTask.duration * (1 - (getStat('finSpeed') * 0.002)));
+            
+            const locationData = config.locations.effects[player.currentLocation];
+            if (locationData && locationData.salinity === 0 && player.activeBuffs.some(b => b.spellKey === 'amphibiousGrace')) {
+                currentTask.duration = Math.floor(currentTask.duration * 0.9);
+            }
+
+            logMessage(currentTask.description, currentTask.type);
+        }
+
+        function startMerchantTrade(merchantData) { currentTask = { description: `Trading with ${merchantData.name}`, duration: randomInt(4000, 8000), progress: 0, type: 'merchantTrade', merchant: merchantData }; }
+
+        function checkForCrafting() {
+            for (const key in config.consumables) {
+                const { recipe, name } = config.consumables[key];
+                if (Object.entries(recipe).every(([ing, count]) => (player.inventory[ing] || 0) >= count)) {
+                    Object.entries(recipe).forEach(([ing, count]) => { player.inventory[ing] -= count; player.encumbrance -= count; if (player.inventory[ing] <= 0) delete player.inventory[ing]; });
+                    player.consumables[key] = (player.consumables[key] || 0) + 1;
+                    logMessage(`Crafted <span class="font-bold text-purple-400">${name}</span>!`, 'craft');
+                    checkForCrafting(); return;
+                }
+            }
+        }
+
+        function handleWorldEvents() {
+            if (currentWorldEvent) {
+                currentWorldEvent.duration--;
+                if (currentWorldEvent.duration <= 0) { logMessage(`The ${currentWorldEvent.name} has ended.`, 'worldEvent'); currentWorldEvent = null; }
+            } else if (Math.random() < 0.05) {
+                const eventKey = getRandom(Object.keys(config.worldEvents));
+                currentWorldEvent = { ...config.worldEvents[eventKey], key: eventKey };
+                logMessage(`A ${currentWorldEvent.name} has begun! ${currentWorldEvent.description}`, 'worldEvent');
+            }
+        }
+
+        function gameLoop() {
+            playtime += config.BASE_TICK_RATE;
+            currentTask.progress += config.BASE_TICK_RATE;
+            if (currentTask.progress >= currentTask.duration) completeTask();
+            updateUI();
+        }
+        
+        function saveGame() {
+            try {
+                dom.saveCode.value = btoa(JSON.stringify({ ...player, playtime }));
+                dom.saveModal.style.display = 'flex';
+            } catch (e) { console.error("Error saving game:", e); logMessage("Error: Could not save game data."); }
+        }
+
+        function loadGame() {
+            const saveData = dom.loadCode.value.trim();
+            if (!saveData) return;
+            try {
+                let loaded = JSON.parse(atob(saveData));
+                if (loaded && loaded.stats && loaded.race) {
+                    player = loaded;
+                    if (!player.activeBuffs) player.activeBuffs = [];
+                    if (!player.reputation) player.reputation = { Bird: 0, Mammal: 0, Crustacean: 0, Mollusk: 0, Echinoderm: 0 };
+                    if (!player.level20Timestamp) player.level20Timestamp = null;
+                    playtime = loaded.playtime || 0;
+                    dom.loadModal.style.display = 'none';
+                    dom.loadCode.value = '';
+                    logMessage('--- Game Loaded Successfully ---');
+                    updateUI();
+                } else throw new Error("Invalid save data.");
+            } catch (e) { console.error("Error loading game:", e); logMessage("Error: Invalid save code."); }
+        }
+
+        function toggleDevMode() {
+            devModeActive = !devModeActive;
+            dom.devModeToggle.classList.toggle('dev-mode-active', devModeActive);
+            clearInterval(gameInterval);
+            gameInterval = setInterval(gameLoop, devModeActive ? config.BASE_TICK_RATE / 10 : config.BASE_TICK_RATE);
+            logMessage(`Developer Mode ${devModeActive ? 'ACTIVATED' : 'DEACTIVATED'}.`);
+        }
+        
+        function setupClassRestrictions() {
+            const allSpells = Object.keys(config.spells);
+            const classSpells = {
+                'Predator': ['predatorsScent', 'finFrenzy', 'jetStream', 'crushingPressure', 'vortex', 'weakenScales'],
+                'Aegis Guard': ['hardenScales', 'barbedHide', 'schoolingTactics', 'crushingPressure', 'weakenScales', 'echolocation'],
+                'Current Rider': ['finFrenzy', 'waveTuning', 'amphibiousGrace', 'jetStream', 'vortex', 'inkCloud'],
+                'Frenzied Brawler': ['predatorsScent', 'finFrenzy', 'crushingPressure', 'jetStream', 'vortex', 'barbedHide'],
+                'Fin Striker': ['finFrenzy', 'jetStream', 'vortex', 'waveTuning', 'predatorsScent', 'weakenScales'],
+                'Filter Feeder': ['hardenScales', 'barbedHide', 'schoolingTactics', 'bubbleSwarm', 'murkyWaters', 'radiantVibes', 'pearlOfLuck', 'symbioticBond', 'sonarPulse', 'treasureGlimmer', 'bioluminescentFlash', 'divineCurrent'],
+                'Ambush Artist': ['predatorsScent', 'jetStream', 'weakenScales', 'deepSlumber', 'inkCloud', 'vortex', 'crushingPressure', 'murkyWaters', 'divineCurrent', 'finFrenzy', 'echolocation', 'bioluminescentFlash'],
+                'Bottom Dweller': ['hardenScales', 'sonarPulse', 'treasureGlimmer', 'crushingPressure', 'echolocation', 'weakenScales', 'barbedHide', 'schoolingTactics', 'abyssalSight', 'murkyWaters', 'inkCloud', 'symbioticBond'],
+                'Coral Sculptor': ['hardenScales', 'bioluminescentFlash', 'pearlOfLuck', 'abyssalSight', 'symbioticBond', 'schoolingTactics', 'bubbleSwarm', 'treasureGlimmer', 'radiantVibes', 'divineCurrent', 'barbedHide', 'finFrenzy'],
+                'Ink Ranger': ['inkCloud', 'murkyWaters', 'weakenScales', 'radiantVibes', 'deepSlumber', 'divineCurrent', 'bubbleSwarm', 'finFrenzy', 'echolocation', 'vortex', 'jetStream', 'sonarPulse'],
+                'Trench Stalker': ['crushingPressure', 'predatorsScent', 'abyssalSight', 'echolocation', 'weakenScales', 'jetStream', 'vortex', 'deepSlumber', 'sonarPulse', 'murkyWaters', 'finFrenzy' , 'barbedHide'],
+                'Kelp Stalker': ['inkCloud', 'murkyWaters', 'deepSlumber', 'finFrenzy', 'divineCurrent', 'radiantVibes', 'sonarPulse', 'amphibiousGrace', 'waveTuning', 'jetStream', 'vortex', 'echolocation'],
+                'Grove Tender': ['symbioticBond', 'hardenScales', 'barbedHide', 'schoolingTactics', 'pearlOfLuck', 'radiantVibes', 'bubbleSwarm', 'bioluminescentFlash', 'sonarPulse', 'treasureGlimmer', 'finFrenzy', 'deepSlumber'],
+                'Abyssal Herald': ['crushingPressure', 'murkyWaters', 'weakenScales', 'radiantVibes', 'abyssalSight', 'predatorsScent', 'echolocation', 'deepSlumber', 'jetStream', 'vortex', 'bubbleSwarm', 'barbedHide'],
+                'Scavenger': ['sonarPulse', 'treasureGlimmer', 'murkyWaters', 'weakenScales', 'inkCloud', 'divineCurrent', 'radiantVibes', 'echolocation', 'amphibiousGrace', 'waveTuning', 'pearlOfLuck', 'abyssalSight', 'symbioticBond', 'deepSlumber', 'bubbleSwarm', 'crushingPressure', 'jetStream', 'vortex'],
+                'Lure Master': ['bioluminescentFlash', 'deepSlumber', 'divineCurrent', 'murkyWaters', 'pearlOfLuck', 'treasureGlimmer', 'abyssalSight', 'symbioticBond', 'weakenScales', 'bubbleSwarm', 'radiantVibes', 'inkCloud', 'sonarPulse', 'echolocation', 'hardenScales', 'finFrenzy', 'schoolingTactics', 'predatorsScent'],
+                'Spore Drifter': ['radiantVibes', 'symbioticBond', 'deepSlumber', 'murkyWaters', 'divineCurrent', 'bubbleSwarm', 'hardenScales', 'pearlOfLuck', 'weakenScales', 'schoolingTactics', 'barbedHide', 'finFrenzy', 'predatorsScent', 'sonarPulse', 'treasureGlimmer', 'abyssalSight', 'echolocation', 'inkCloud'],
+                'Deep Seer': ['sonarPulse', 'echolocation', 'abyssalSight', 'pearlOfLuck', 'treasureGlimmer', 'weakenScales', 'murkyWaters', 'symbioticBond', 'divineCurrent', 'waveTuning', 'amphibiousGrace', 'schoolingTactics', 'hardenScales', 'finFrenzy', 'radiantVibes', 'bioluminescentFlash', 'inkCloud', 'bubbleSwarm']
+            };
+            config.classes.forEach(c => config.classRestrictions[c] = allSpells.filter(s => !(classSpells[c] || []).includes(s)));
+        }
+
+        // --- INITIALIZATION ---
+        function init() {
+            const ids = ['characterName', 'characterRaceClass', 'playtime', 'statBiteForce', 'statFinSpeed', 'statScaleHardness', 'statLateralLine', 'statInstinct', 'statLuminescence', 'spellbookList', 'equipMouth', 'equipDorsalFin', 'equipCranialPlate', 'equipScales', 'equipTailFin', 'equipSymbiont', 'log', 'level', 'currentXp', 'nextLevelXp', 'xpBar', 'currentAction', 'actionBar', 'shells', 'encumbrance', 'inventoryList', 'saveBtn', 'loadBtn', 'saveModal', 'loadModal', 'saveCode', 'loadCode', 'closeSaveModal', 'closeLoadModal', 'confirmLoad', 'funFactText', 'reputationList', 'consumableList', 'devModeToggle', 'currentLocationDisplay', 'level20Time'];
+            ids.forEach(id => dom[id] = document.getElementById(id));
+            
+            setupClassRestrictions();
+            calculateMaxTravelDistance();
+            generateCharacter();
+            logMessage('A new journey begins in the vast, silent deep.');
+            startNewTask();
+            updateUI();
+            
+            gameInterval = setInterval(gameLoop, config.BASE_TICK_RATE);
+            factInterval = setInterval(() => dom.funFactText.textContent = getRandom(config.fishFacts), 30000);
+            dom.funFactText.textContent = getRandom(config.fishFacts);
+
+            dom.saveBtn.addEventListener('click', saveGame);
+            dom.loadBtn.addEventListener('click', () => { dom.loadModal.style.display = 'flex'; });
+            dom.closeSaveModal.addEventListener('click', () => { dom.saveModal.style.display = 'none'; });
+            dom.closeLoadModal.addEventListener('click', () => { dom.loadModal.style.display = 'none'; });
+            dom.confirmLoad.addEventListener('click', loadGame);
+            dom.devModeToggle.addEventListener('click', toggleDevMode);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
